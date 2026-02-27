@@ -23,15 +23,17 @@ const TeacherDashboard = () => {
                 setExams(examsResult.value.data);
             } else {
                 console.error('Failed to fetch exams', examsResult.reason);
-                setExams([]);
+                // Preserve existing exams state; show error instead of empty list
+                setError('Failed to load exams. Please try again.');
             }
             if (overviewResult.status === 'fulfilled') {
                 setOverview(overviewResult.value.data);
             } else {
                 console.error('Failed to fetch overview', overviewResult.reason);
-                setOverview(null);
+                // Preserve existing overview state; don't overwrite with null
+                if (!error) setError('Failed to load overview data. Please try again.');
             }
-            // Show error only if both failed
+            // Show combined error if both failed
             if (examsResult.status === 'rejected' && overviewResult.status === 'rejected') {
                 setError('Failed to load dashboard data. Please try again.');
             }

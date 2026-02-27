@@ -6,41 +6,53 @@ const { evaluateATI } = require('../utils/atiService');
  * Used by both finishSubmission and submitExam to eliminate duplication.
  */
 async function finalizeSubmission(submissionId, userId) {
-  // Verify ownership
-  const subResult = await query('SELECT student_id, status, exam_id FROM submissions WHERE id = $1', [submissionId]);
-  if (subResult.rows.length === 0) {
-    return { statusCode: 404, body: { message: 'Submission not found' } };
-  }
-
-  const submission = subResult.rows[0];
-
-  if (submission.student_id !== userId) {
-    return { statusCode: 403, body: { message: 'Forbidden: You do not own this submission' } };
-  }
-
-  if (submission.status === 'submitted' || submission.status === 'finalized') {
-    return { statusCode: 400, body: { message: 'Submission already finalized' } };
-  }
-
-  // Time-based guard: if submission_time >= end_time, mark as auto-submitted
-  let isAutoSubmitted = false;
-  const examResult = await query('SELECT end_time FROM exams WHERE id = $1', [submission.exam_id]);
-  if (examResult.rows.length > 0 && examResult.rows[0].end_time) {
-    const endTime = new Date(examResult.rows[0].end_time);
-    if (new Date() >= endTime) {
-      isAutoSubmitted = true;
-    }
-  }
-
-  // Use a client for transaction support
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    await client.query(
-      `UPDATE submissions SET submitted_at = CURRENT_TIMESTAMP, status = 'submitted' WHERE id = $1`,
+    // Lock the submission row to prevent TOCTOU race conditions
+    const subResult = await client.query(
+      'SELECT student_id, status, exam_id FROM submissions WHERE id = $1 FOR UPDATE',
       [submissionId]
     );
+    if (subResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return { statusCode: 404, body: { message: 'Submission not found' } };
+    }
+
+    const submission = subResult.rows[0];
+
+    if (submission.student_id !== userId) {
+      await client.query('ROLLBACK');
+      return { statusCode: 403, body: { message: 'Forbidden: You do not own this submission' } };
+    }
+
+    if (submission.status === 'submitted' || submission.status === 'finalized') {
+      await client.query('ROLLBACK');
+      return { statusCode: 400, body: { message: 'Submission already finalized' } };
+    }
+
+    // Time-based guard: if submission_time >= end_time, mark as auto-submitted
+    let isAutoSubmitted = false;
+    const examResult = await client.query('SELECT end_time FROM exams WHERE id = $1', [submission.exam_id]);
+    if (examResult.rows.length > 0 && examResult.rows[0].end_time) {
+      const endTime = new Date(examResult.rows[0].end_time);
+      if (new Date() >= endTime) {
+        isAutoSubmitted = true;
+      }
+    }
+
+    // Use explicit WHERE status = 'in_progress' to prevent concurrent double-submits
+    const updateResult = await client.query(
+      `UPDATE submissions SET submitted_at = CURRENT_TIMESTAMP, status = 'submitted' WHERE id = $1 AND status = 'in_progress' RETURNING id`,
+      [submissionId]
+    );
+
+    if (updateResult.rowCount === 0) {
+      // Another concurrent request already submitted this
+      await client.query('ROLLBACK');
+      return { statusCode: 400, body: { message: 'Submission already finalized' } };
+    }
 
     // Trigger real ATI grading
     await calculateScores(client, submissionId, submission.exam_id);
