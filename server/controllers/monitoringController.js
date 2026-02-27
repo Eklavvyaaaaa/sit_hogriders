@@ -1,20 +1,99 @@
-const { query } = require('../config/db');
+const { query, pool } = require('../config/db');
+const { getIO } = require('../utils/socketSetup');
+
+const AUTO_SUBMIT_THRESHOLD = 5;
 
 exports.logEvent = async (req, res) => {
     try {
-        const { examId, eventType } = req.body;
+        const { examId, eventType, severity } = req.body;
         const studentId = req.user.id;
 
         if (!examId || !eventType) {
             return res.status(400).json({ message: 'Exam ID and event type are required' });
         }
 
+        const severityLevel = ['low', 'medium', 'high'].includes(severity) ? severity : 'medium';
+
+        // Insert log with severity
         await query(
-            'INSERT INTO monitoring_logs (user_id, exam_id, event_type) VALUES ($1, $2, $3)',
-            [studentId, examId, eventType]
+            'INSERT INTO monitoring_logs (user_id, exam_id, event_type, severity) VALUES ($1, $2, $3, $4)',
+            [studentId, examId, eventType, severityLevel]
         );
 
-        res.status(201).json({ message: 'Log recorded' });
+        // Increment violation count in students_exam
+        const upsertResult = await query(`
+            INSERT INTO students_exam (student_id, exam_id, violation_count)
+            VALUES ($1, $2, 1)
+            ON CONFLICT (student_id, exam_id)
+            DO UPDATE SET violation_count = students_exam.violation_count + 1
+            RETURNING violation_count, flagged
+        `, [studentId, examId]);
+
+        const { violation_count, flagged: initiallyFlagged } = upsertResult.rows[0];
+        let isFlagged = initiallyFlagged;
+
+        // Auto-flag if >3 violations
+        if (violation_count > 3 && !isFlagged) {
+            await query(
+                'UPDATE students_exam SET flagged = true WHERE student_id = $1 AND exam_id = $2',
+                [studentId, examId]
+            );
+            isFlagged = true;
+        }
+
+        // Auto-submit if violation threshold exceeded
+        let autoSubmitted = false;
+        if (violation_count >= AUTO_SUBMIT_THRESHOLD) {
+            const client = await pool.connect();
+            try {
+                await client.query('BEGIN');
+                const submission = await client.query(
+                    "SELECT id, status FROM submissions WHERE student_id = $1 AND exam_id = $2 AND status = 'in_progress'",
+                    [studentId, examId]
+                );
+
+                if (submission.rows.length > 0) {
+                    await client.query(
+                        "UPDATE submissions SET status = 'submitted', submitted_at = CURRENT_TIMESTAMP WHERE id = $1",
+                        [submission.rows[0].id]
+                    );
+                    await client.query(
+                        'UPDATE students_exam SET submitted = true WHERE student_id = $1 AND exam_id = $2',
+                        [studentId, examId]
+                    );
+                    autoSubmitted = true;
+                }
+                await client.query('COMMIT');
+            } catch (err) {
+                await client.query('ROLLBACK');
+                console.error('Transaction error in auto-submit:', err);
+                autoSubmitted = false;
+            } finally {
+                client.release();
+            }
+        }
+
+        // Emit socket event
+        const io = getIO();
+        if (io) {
+            io.to(`exam:${examId}`).emit('violation:new', {
+                studentId,
+                examId,
+                eventType,
+                severity: severityLevel,
+                violationCount: violation_count,
+                flagged: isFlagged,
+                autoSubmitted,
+                timestamp: new Date().toISOString()
+            });
+        }
+
+        res.status(201).json({
+            message: autoSubmitted ? 'Log recorded. Exam auto-submitted due to excessive violations.' : 'Log recorded',
+            violationCount: violation_count,
+            flagged: isFlagged,
+            autoSubmitted
+        });
     } catch (error) {
         console.error('Log event error:', error);
         res.status(500).json({ message: 'Server error' });

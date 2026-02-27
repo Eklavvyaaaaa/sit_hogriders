@@ -7,6 +7,9 @@ import CreateExam from './pages/CreateExam';
 import JoinClassroom from './pages/JoinClassroom';
 import ExamPage from './pages/ExamPage';
 import MonitorDashboard from './pages/MonitorDashboard';
+import StudentHistory from './pages/StudentHistory';
+import SubmissionResults from './pages/SubmissionResults';
+import ExamResults from './pages/ExamResults';
 
 const ProtectedRoute = ({ children, roleRequired }) => {
   const { user, loading } = useContext(AuthContext);
@@ -64,6 +67,14 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/exam-results/:examId"
+        element={
+          <ProtectedRoute roleRequired="teacher">
+            <ExamResults />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Student Routes */}
       <Route
@@ -79,6 +90,24 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute roleRequired="student">
             <ExamPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/history"
+        element={
+          <ProtectedRoute roleRequired="student">
+            <StudentHistory />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Shared Routes */}
+      <Route
+        path="/results/:submissionId"
+        element={
+          <ProtectedRoute>
+            <SubmissionResults />
           </ProtectedRoute>
         }
       />
