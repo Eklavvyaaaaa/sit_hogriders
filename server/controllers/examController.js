@@ -444,6 +444,10 @@ exports.rescheduleExam = async (req, res) => {
             return res.status(400).json({ message: 'Invalid date format for new_time' });
         }
 
+        if (parsedTime <= new Date()) {
+            return res.status(400).json({ message: 'New schedule time must be in the future' });
+        }
+
         const result = await query(
             "UPDATE exams SET end_time = $1, status = 'scheduled' WHERE id = $2 AND teacher_id = $3 RETURNING *",
             [parsedTime, id, teacherId]
