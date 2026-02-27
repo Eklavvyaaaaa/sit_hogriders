@@ -6,6 +6,7 @@ import MonitoringCamera from '../components/MonitoringCamera';
 import api from '../services/api';
 import { AuthContext } from '../context/AuthContext';
 import { CheckCircle2, ShieldCheck, PlayCircle, LogIn, ChevronLeft, ChevronRight, Info } from 'lucide-react';
+import ChatBox from '../components/ChatBox';
 
 const ExamPage = () => {
     const location = useLocation();
@@ -320,6 +321,8 @@ const ExamPage = () => {
                     </div>
                 </div>
             </div>
+
+            <ChatBox examId={examData.examId} />
 
             {/* Warning Bar */}
             <div className="bg-blue-600 text-white px-8 py-2.5 text-center text-xs font-bold tracking-wide italic">

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import api from '../services/api';
 import { ShieldAlert, RefreshCw, EyeOff, UserSearch, AlertCircle, Download, Flag, BarChart3 } from 'lucide-react';
+import ChatBox from '../components/ChatBox';
 
 const MonitorDashboard = () => {
   const { examId } = useParams();
@@ -223,6 +224,7 @@ const MonitorDashboard = () => {
           </div>
         </div>
       </div>
+      <ChatBox examId={examId} />
     </div>
   );
 };
