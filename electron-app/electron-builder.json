@@ -1,0 +1,23 @@
+{
+  "appId": "com.exam-monitoring.app",
+  "productName": "Secure Exam Monitor",
+  "directories": {
+    "output": "dist",
+    "buildResources": "build"
+  },
+  "files": [
+    "main.js",
+    "preload.js",
+    "client/dist/**/*"
+  ],
+  "mac": {
+    "category": "public.app-category.education",
+    "target": ["dmg"]
+  },
+  "win": {
+    "target": ["nsis"]
+  },
+  "linux": {
+    "target": ["AppImage"]
+  }
+}
