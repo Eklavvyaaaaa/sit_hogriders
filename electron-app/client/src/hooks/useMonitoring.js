@@ -359,7 +359,7 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
     // ══════════════════════════════════════════════════════
     // 5. PUBLIC API
     // ══════════════════════════════════════════════════════
-    const startMonitoring = async (videoElement, existingStream = null) => {
+    const startMonitoring = useCallback(async (videoElement, existingStream = null) => {
         videoRef.current = videoElement;
         log('Camera', 'Requesting camera access...');
 
@@ -383,9 +383,9 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
             sendLog('Camera access denied');
             setMonitoringError('Camera access denied or unavailable. Monitoring disabled.');
         }
-    };
+    }, [sendLog]);
 
-    const stopMonitoring = () => {
+    const stopMonitoring = useCallback(() => {
         log('Stop', 'stopMonitoring called');
         setIsMonitoring(false);
 
@@ -401,7 +401,7 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
             streamRef.current.getTracks().forEach(track => track.stop());
             streamRef.current = null;
         }
-    };
+    }, []);
 
     return {
         startMonitoring,
