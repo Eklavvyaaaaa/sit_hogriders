@@ -32,7 +32,7 @@ exports.getTeacherExams = async (req, res) => {
         const teacherId = req.user.id;
         const { status, highViolations } = req.query;
 
-        let sql = 'SELECT e.*, c.code as exam_code FROM exams e LEFT JOIN classrooms c ON e.id = c.exam_id WHERE e.teacher_id = $1';
+        let sql = 'SELECT e.*, (SELECT c.code FROM classrooms c WHERE c.exam_id = e.id LIMIT 1) as exam_code FROM exams e WHERE e.teacher_id = $1';
         const params = [teacherId];
 
         if (status) {
@@ -47,14 +47,18 @@ exports.getTeacherExams = async (req, res) => {
 
         if (highViolations === 'true') {
             const enrichedResult = await query(`
-                SELECT e.*, c.code as exam_code, COUNT(m.id) as "violationCount"
+                SELECT e.*, 
+                       (SELECT c.code FROM classrooms c WHERE c.exam_id = e.id LIMIT 1) as exam_code, 
+                       COALESCE(m.violationCount, 0) as "violationCount"
                 FROM exams e
-                LEFT JOIN classrooms c ON e.id = c.exam_id
-                LEFT JOIN monitoring_logs m ON e.id = m.exam_id
+                LEFT JOIN (
+                    SELECT exam_id, COUNT(*) as violationCount
+                    FROM monitoring_logs
+                    GROUP BY exam_id
+                ) m ON e.id = m.exam_id
                 WHERE e.teacher_id = $1
                 ${status ? `AND e.status = $2` : ''}
-                GROUP BY e.id, c.code
-                HAVING COUNT(m.id) > 5
+                AND COALESCE(m.violationCount, 0) > 5
                 ORDER BY e.created_at DESC NULLS LAST
             `, status ? [teacherId, status] : [teacherId]);
             exams = enrichedResult.rows.map(row => ({ ...row, violationCount: parseInt(row.violationCount) }));
