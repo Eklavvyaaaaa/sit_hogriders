@@ -2,13 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import api from '../services/api';
-import { PlusCircle, Eye, Activity, BarChart3, Users, AlertTriangle, Flag, Download, Trophy, CheckCircle2, Loader2, Clock, XCircle, CalendarClock, Copy } from 'lucide-react';
+import { PlusCircle, Eye, Activity, BarChart3, Users, AlertTriangle, Flag, Download, Trophy, CheckCircle2, Loader2, Clock, XCircle, CalendarClock, Copy, MessageSquare } from 'lucide-react';
+import ChatBox from '../components/ChatBox';
 
 const TeacherDashboard = () => {
     const [exams, setExams] = useState([]);
     const [overview, setOverview] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [chatExamId, setChatExamId] = useState(null);
     const navigate = useNavigate();
 
     const fetchDashboardData = async () => {
@@ -360,6 +362,18 @@ const TeacherDashboard = () => {
                                                     <span>Export</span>
                                                 </button>
                                             </div>
+                                            {exam.status === 'active' && (
+                                                <button
+                                                    onClick={() => setChatExamId(chatExamId === exam.id ? null : exam.id)}
+                                                    className={`mt-2 w-full flex items-center justify-center space-x-2 py-2 rounded-lg text-sm font-medium transition-colors border ${chatExamId === exam.id
+                                                        ? 'bg-blue-600 text-white border-blue-500'
+                                                        : 'bg-blue-900/30 hover:bg-blue-900/50 text-blue-400 border-blue-900/50'
+                                                        }`}
+                                                >
+                                                    <MessageSquare size={14} />
+                                                    <span>{chatExamId === exam.id ? 'Close Chat' : 'Chat'}</span>
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 ))
@@ -368,6 +382,7 @@ const TeacherDashboard = () => {
                     </>
                 )}
             </div >
+            {chatExamId && <ChatBox examId={chatExamId} />}
         </div >
     );
 };

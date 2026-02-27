@@ -40,7 +40,7 @@ const initDB = async () => {
         code TEXT UNIQUE NOT NULL,
         exam_id INTEGER REFERENCES exams(id),
         teacher_id INTEGER REFERENCES users(id),
-        expires_at TIMESTAMP
+        expires_at TIMESTAMPTZ
       );
 
       CREATE TABLE IF NOT EXISTS submissions (
@@ -60,6 +60,14 @@ const initDB = async () => {
         event_type TEXT NOT NULL,
         severity TEXT DEFAULT 'medium',
         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        id SERIAL PRIMARY KEY,
+        exam_id INTEGER REFERENCES exams(id),
+        sender_id INTEGER REFERENCES users(id),
+        message_text TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
       CREATE TABLE IF NOT EXISTS answers (
@@ -114,7 +122,10 @@ const initDB = async () => {
       "ALTER TABLE exams ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
       "ALTER TABLE exams ADD COLUMN IF NOT EXISTS end_time TIMESTAMP",
       "ALTER TABLE monitoring_logs ADD COLUMN IF NOT EXISTS severity TEXT DEFAULT 'medium'",
-      "ALTER TABLE classrooms ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP"
+      "ALTER TABLE classrooms ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ",
+      "ALTER TABLE classrooms ALTER COLUMN expires_at TYPE TIMESTAMPTZ",
+      // Rename legacy 'message' column to 'message_text' if it exists
+      "DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chat_messages' AND column_name='message') THEN ALTER TABLE chat_messages RENAME COLUMN message TO message_text; END IF; END $$"
     ];
 
     for (const migration of migrations) {
