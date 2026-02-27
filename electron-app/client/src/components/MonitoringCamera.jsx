@@ -16,8 +16,6 @@ const MonitoringCamera = ({ examId, stream }) => {
         canvas.width = video.clientWidth;
         canvas.height = video.clientHeight;
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
         if (!data) return;
 
         const { boundingBox, yaw, pitch } = data;
@@ -67,7 +65,7 @@ const MonitoringCamera = ({ examId, stream }) => {
         return () => {
             stopMonitoring();
         };
-    }, [isReady]);
+    }, [isReady, startMonitoring, stopMonitoring, stream]);
 
     return (
         <div className="bg-slate-800 rounded-xl overflow-hidden shadow-lg border border-slate-700 flex flex-col">

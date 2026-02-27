@@ -27,7 +27,7 @@ const initializeGlobalMediaPipe = async () => {
             if (!globalVisionResolver) {
                 log('Init', 'Loading WASM FilesetResolver...');
                 globalVisionResolver = await FilesetResolver.forVisionTasks(
-                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
+                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.32/wasm"
                 );
             }
 
@@ -59,6 +59,7 @@ const initializeGlobalMediaPipe = async () => {
 
             return globalFaceLandmarker;
         } catch (error) {
+            globalInitPromise = null;
             err('Init', 'Fatal error during global initialization:', error.message);
             throw error;
         } finally {
@@ -69,7 +70,7 @@ const initializeGlobalMediaPipe = async () => {
     return globalInitPromise;
 };
 
-export const useMonitoring = (examId, onFrameUpdate) => {
+export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
     // ── State ──
     const [isMonitoring, setIsMonitoring] = useState(false);
     const [alerts, setAlerts] = useState([]);
@@ -229,8 +230,7 @@ export const useMonitoring = (examId, onFrameUpdate) => {
                         const leftEar = face[234];
                         const rightEar = face[454];
 
-                        const yawThreshold = 0.05;
-                        const pitchThreshold = 0.04;
+                        const { yawThreshold = 0.05, pitchThreshold = 0.04 } = options;
 
                         const earMidpointX = (leftEar.x + rightEar.x) / 2;
                         const verticalMidpointY = (forehead.y + chin.y) / 2;

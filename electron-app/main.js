@@ -2,13 +2,40 @@ const { app, BrowserWindow, globalShortcut, ipcMain, session } = require('electr
 const path = require('path');
 const isDev = require('electron-is-dev');
 
-// Global Exception Handlers to Prevent Crash
+let isShuttingDown = false;
+
+const performGracefulShutdown = (source, error) => {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
+  console.error(`[Electron] FATAL ERROR (${source}):`, error?.stack || error);
+
+  // Attempt to notify renderer gracefully
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    try {
+      mainWindow.webContents.send('fatal-error', 'The monitoring system encountered a critical error. Restarting...');
+    } catch (e) {
+      console.error('[Electron] Failed to notify renderer of crash:', e);
+    }
+  }
+
+  // Relaunch in production to recover from crash, otherwise exit 
+  if (!isDev) {
+    console.log('[Electron] Restarting application...');
+    app.relaunch();
+  }
+
+  app.exit(1);
+};
+
+// Global Exception Handlers to Prevent Zombie Processes
 process.on('uncaughtException', (error) => {
-  console.error('[Electron] Uncaught Exception:', error);
+  performGracefulShutdown('uncaughtException', error);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('[Electron] Unhandled Rejection at:', promise, 'reason:', reason);
+  console.error('[Electron] Unhandled Rejection at:', promise);
+  performGracefulShutdown('unhandledRejection', reason);
 });
 
 let mainWindow;
@@ -31,7 +58,10 @@ function createWindow() {
       devTools: isDev, // Only enable devTools in development environment
       backgroundThrottling: false,
       webgl: true,
-      sandbox: false // Required for some hardware accelerated MediaPipe flows
+      // Security warning: sandbox is disabled to allow MediaPipe's GPU hardware acceleration
+      // to access native WebGL resources securely on Windows/Linux environments.
+      // Defenses: nodeIntegration is false, contextIsolation is true, and navigation is locked.
+      sandbox: false
     }
   });
 
@@ -162,14 +192,6 @@ ipcMain.on('deactivate-lock', () => {
 });
 
 app.on('ready', () => {
-  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-    if (permission === 'media') {
-      callback(true);
-    } else {
-      callback(false);
-    }
-  });
-
   createWindow();
 });
 
