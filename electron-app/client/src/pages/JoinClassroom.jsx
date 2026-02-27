@@ -114,7 +114,14 @@ const JoinClassroom = () => {
                                     <AlertTriangle size={18} className="text-red-400 shrink-0" />
                                     <p className="text-red-600 text-sm font-bold flex-1">{historyError}</p>
                                     <button
-                                        onClick={() => window.location.reload()}
+                                        onClick={() => {
+                                            setHistoryLoading(true);
+                                            setHistoryError(null);
+                                            api.get('/history/student')
+                                                .then(res => setPastExams(res.data.slice(0, 5)))
+                                                .catch(() => setHistoryError('Failed to load past exams.'))
+                                                .finally(() => setHistoryLoading(false));
+                                        }}
                                         className="text-[10px] bg-red-100 hover:bg-red-200 text-red-700 font-bold px-2 py-1 rounded uppercase tracking-wider transition-colors"
                                     >
                                         Retry
@@ -150,11 +157,18 @@ const JoinClassroom = () => {
                                             statusConfig = { bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-200', label: exam.status === 'in_progress' ? 'In Progress' : 'Evaluating' };
                                         }
 
+                                        const canNavigate = !!exam.submission_id;
+
                                         return (
-                                            <div
-                                                key={exam.submission_id || index}
-                                                onClick={() => navigate(`/history/submission/${exam.submission_id}`)}
-                                                className="group relative flex items-center justify-between bg-white rounded-2xl p-5 border border-slate-200 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.1)] hover:border-blue-300 transition-all duration-300 cursor-pointer overflow-hidden"
+                                            <button
+                                                key={exam.submission_id || `exam-${index}`}
+                                                type="button"
+                                                onClick={() => { if (canNavigate) navigate(`/history/submission/${exam.submission_id}`); }}
+                                                disabled={!canNavigate}
+                                                className={`group relative flex items-center justify-between bg-white rounded-2xl p-5 border border-slate-200 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] transition-all duration-300 overflow-hidden text-left w-full ${canNavigate
+                                                        ? 'hover:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.1)] hover:border-blue-300 cursor-pointer'
+                                                        : 'opacity-70 cursor-default'
+                                                    }`}
                                             >
                                                 {/* Left structural visual */}
                                                 <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-gradient-to-b from-blue-400 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -197,12 +211,14 @@ const JoinClassroom = () => {
                                                 </div>
 
                                                 {/* Hover Arrow */}
-                                                <div className="absolute right-[-40px] opacity-0 group-hover:opacity-100 group-hover:right-4 bg-white/50 backdrop-blur-sm h-full flex items-center transition-all duration-300">
-                                                    <div className="w-8 h-8 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-sm">
-                                                        <ChevronRight size={16} />
+                                                {canNavigate && (
+                                                    <div className="absolute right-[-40px] opacity-0 group-hover:opacity-100 group-hover:right-4 bg-white/50 backdrop-blur-sm h-full flex items-center transition-all duration-300">
+                                                        <div className="w-8 h-8 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-sm">
+                                                            <ChevronRight size={16} />
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </div>
+                                                )}
+                                            </button>
                                         );
                                     })}
                                 </div>
