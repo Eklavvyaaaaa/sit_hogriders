@@ -1,3 +1,4 @@
+import os
 from flask import Flask, request, jsonify
 from content_module import calculate_cis
 from pattern_module import calculate_pcs
@@ -10,10 +11,10 @@ app = Flask(__name__)
 # ----------------------------------
 @app.route("/evaluate-cis", methods=["POST"])
 def evaluate_cis():
-    data = request.get_json()
+    data = request.get_json(silent=True)
 
-    if not data:
-        return jsonify({"error": "No input data provided"}), 400
+    if data is None or not isinstance(data, dict):
+        return jsonify({"error": "Invalid or missing JSON payload"}), 400
 
     student_answer = data.get("student_answer", "")
     model_answer = data.get("model_answer", "")
@@ -32,15 +33,24 @@ def evaluate_cis():
 # ----------------------------------
 @app.route("/evaluate-ati", methods=["POST"])
 def evaluate_ati():
-    data = request.get_json()
+    data = request.get_json(silent=True)
 
-    if not data:
-        return jsonify({"error": "No input data provided"}), 400
+    if data is None or not isinstance(data, dict):
+        return jsonify({"error": "Invalid or missing JSON payload"}), 400
 
     student_answer = data.get("student_answer", "")
     model_answer = data.get("model_answer", "")
     key_points = data.get("key_points", [])
-    visual_score = data.get("visual_score", 100)  # Default if not provided
+    
+    # Robust visual_score validation and clamping
+    raw_visual_score = data.get("visual_score", 100)
+    try:
+        visual_score_validated = float(raw_visual_score)
+    except (TypeError, ValueError):
+        visual_score_validated = 100.0
+    
+    # Clamp to 0-100
+    visual_score_validated = max(0.0, min(visual_score_validated, 100.0))
 
     if not student_answer or not model_answer:
         return jsonify({"error": "Missing required fields"}), 400
@@ -65,7 +75,7 @@ def evaluate_ati():
     # Pattern = 20%
     ati_score = (
         0.5 * content_score +
-        0.3 * visual_score +
+        0.3 * visual_score_validated +
         0.2 * pattern_score
     )
 
@@ -84,7 +94,7 @@ def evaluate_ati():
     return jsonify({
         "ati_score": ati_score,
         "content_score": content_score,
-        "visual_score": visual_score,
+        "visual_score": visual_score_validated,
         "pattern_score": pattern_score,
         "trust_level": trust_level
     })
@@ -94,4 +104,14 @@ def evaluate_ati():
 # Run Server
 # ----------------------------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000, debug=True)
+    # Safe environment-based configuration
+    host = os.environ.get("HOST", "127.0.0.1")
+    port = int(os.environ.get("PORT", 8000))
+    debug_mode = os.environ.get("DEBUG", "False").lower() in ("true", "1", "t")
+
+    # Security safeguard: don't allow debug mode when binding to all interfaces
+    if host == "0.0.0.0" and debug_mode:
+        print("WARNING: Debug mode disabled for security (host=0.0.0.0)")
+        debug_mode = False
+
+    app.run(host=host, port=port, debug=debug_mode)
