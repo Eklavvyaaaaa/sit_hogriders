@@ -57,7 +57,7 @@ const QuestionCard = ({ question, index, selectedOption, onSelectOption, textAns
                                 value={i}
                                 checked={selectedOption === i}
                                 onChange={() => onSelectOption(index, i)}
-                                className="hidden"
+                                className="sr-only"
                             />
                             <span className={`text-lg font-bold ${selectedOption === i ? 'text-blue-900' : 'text-slate-600'}`}>
                                 {option}

@@ -16,15 +16,15 @@ const Navbar = () => {
     return (
         <nav className="bg-white text-slate-800 px-8 py-4 flex justify-between items-center shadow-sm border-b border-slate-100 sticky top-0 z-50">
             <div className="flex items-center space-x-8">
-                <div
-                    className="flex items-center space-x-2 cursor-pointer"
-                    onClick={() => navigate(user?.role === 'teacher' ? '/teacher' : '/join')}
+                <Link
+                    to={user?.role === 'teacher' ? '/teacher' : '/join'}
+                    className="flex items-center space-x-2"
                 >
                     <div className="bg-blue-600 p-1.5 rounded-lg text-white">
                         <Shield size={20} />
                     </div>
                     <span className="text-xl font-bold tracking-tight text-slate-900">ATI Secure</span>
-                </div>
+                </Link>
 
                 {user && (
                     <div className="hidden lg:flex items-center space-x-1 text-sm font-bold uppercase tracking-wider">
@@ -59,7 +59,10 @@ const Navbar = () => {
 
             {user && (
                 <div className="flex items-center space-x-6">
-                    <button className="text-slate-400 hover:text-slate-600 transition-colors relative">
+                    <button
+                        aria-label="Notifications"
+                        className="text-slate-400 hover:text-slate-600 transition-colors relative"
+                    >
                         <Bell size={20} />
                         <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
                     </button>
@@ -75,6 +78,7 @@ const Navbar = () => {
                         <button
                             onClick={handleLogout}
                             className="text-slate-400 hover:text-red-500 transition-colors ml-2"
+                            aria-label="Logout"
                             title="Logout"
                         >
                             <LogOut size={18} />

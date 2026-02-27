@@ -138,6 +138,10 @@ const ExamPage = () => {
                 score
             });
             setIsSubmitted(true);
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach(t => t.stop());
+                streamRef.current = null;
+            }
             if (window.electronAPI) window.electronAPI.deactivateLock();
             if (removeFocusListenerRef.current) removeFocusListenerRef.current();
         } catch (err) {
@@ -226,14 +230,18 @@ const ExamPage = () => {
                 {/* Main Content (Stepper UI) */}
                 <div className="flex-1 overflow-y-auto p-12 flex flex-col items-center">
                     <div className="max-w-3xl w-full pb-32">
-                        <QuestionCard
-                            question={examData.questions[currentIndex]}
-                            index={currentIndex}
-                            selectedOption={answers[currentIndex]}
-                            onSelectOption={handleSelectOption}
-                            textAnswer={textAnswers[currentIndex]}
-                            onTextAnswer={handleTextAnswer}
-                        />
+                        {examData?.questions && examData.questions.length > 0 && currentIndex >= 0 && currentIndex < examData.questions.length ? (
+                            <QuestionCard
+                                question={examData.questions[currentIndex]}
+                                index={currentIndex}
+                                selectedOption={answers[currentIndex]}
+                                onSelectOption={handleSelectOption}
+                                textAnswer={textAnswers[currentIndex]}
+                                onTextAnswer={handleTextAnswer}
+                            />
+                        ) : (
+                            <div className="p-8 text-center text-slate-500">No question available.</div>
+                        )}
 
                         <div className="flex justify-between mt-8">
                             <button

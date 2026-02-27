@@ -71,15 +71,6 @@ const Login = () => {
             } else {
                 const user = await login(formData.email, formData.password);
                 console.log("Login successful:", user);
-
-                // Also store token in localStorage for direct API calls
-                const token = document.cookie
-                    .split('; ')
-                    .find(row => row.startsWith('token='))
-                    ?.split('=')[1];
-                if (token) {
-                    localStorage.setItem("token", token);
-                }
                 if (user.role) {
                     localStorage.setItem("role", user.role);
                 }
@@ -137,7 +128,7 @@ const Login = () => {
                     <div className="absolute top-0 left-0 w-full h-1.5 bg-blue-600"></div>
 
                     <div ref={formRef} className="p-12">
-                        <h2 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">Sign in</h2>
+                        <h2 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">{isRegister ? 'Create Account' : 'Sign in'}</h2>
                         <p className="text-slate-500 text-sm mb-10 font-medium">
                             {isRegister ? 'Already have an account?' : 'New to ATI Secure?'}{' '}
                             <button type="button" onClick={handleToggle} className="text-blue-600 font-bold hover:underline">
@@ -193,6 +184,9 @@ const Login = () => {
                                     <button
                                         type="button"
                                         onClick={() => setShowPassword(!showPassword)}
+                                        aria-label={showPassword ? "Hide password" : "Show password"}
+                                        aria-pressed={showPassword}
+                                        title={showPassword ? "Hide password" : "Show password"}
                                         className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
                                     >
                                         {showPassword ? <EyeOff size={22} /> : <Eye size={22} />}
