@@ -2,8 +2,49 @@ const { app, BrowserWindow, globalShortcut, ipcMain, session } = require('electr
 const path = require('path');
 const isDev = require('electron-is-dev');
 
+let isShuttingDown = false;
+
+const performGracefulShutdown = (source, error) => {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
+  console.error(`[Electron] FATAL ERROR (${source}):`, error?.stack || error);
+
+  // Attempt to notify renderer gracefully
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    try {
+      mainWindow.webContents.send('fatal-error', 'The monitoring system encountered a critical error. Restarting...');
+    } catch (e) {
+      console.error('[Electron] Failed to notify renderer of crash:', e);
+    }
+  }
+
+  // Relaunch in production to recover from crash, otherwise exit 
+  if (!isDev) {
+    console.log('[Electron] Restarting application...');
+    app.relaunch();
+  }
+
+  app.exit(1);
+};
+
+// Global Exception Handlers to Prevent Zombie Processes
+process.on('uncaughtException', (error) => {
+  performGracefulShutdown('uncaughtException', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Electron] Unhandled Rejection at:', promise);
+  performGracefulShutdown('unhandledRejection', reason);
+});
+
 let mainWindow;
 let isLocked = false;
+
+// Fix Windows "Access is denied (0x5)" and GPU Cache errors
+app.setPath('userData', path.join(app.getPath('appData'), 'sit_hogriders_cache'));
+app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
+app.commandLine.appendSwitch('disable-gpu-disk-cache'); // Prevent the failed: -2 error
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -14,8 +55,43 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
-      devTools: isDev // Only enable devTools in development environment
+      devTools: isDev, // Only enable devTools in development environment
+      backgroundThrottling: false,
+      webgl: true,
+      // Security warning: sandbox is disabled to allow MediaPipe's GPU hardware acceleration
+      // to access native WebGL resources securely on Windows/Linux environments.
+      // Defenses: nodeIntegration is false, contextIsolation is true, and navigation is locked.
+      sandbox: false
     }
+  });
+
+  // Handle Permissions for Camera/Microphone — validate origin
+  const allowedPermissions = ['media', 'camera', 'microphone'];
+
+  const isTrustedOrigin = (url) => {
+    if (!url) return false;
+    try {
+      if (url.startsWith('file://')) return true;
+      const parsed = new URL(url);
+      return parsed.hostname === 'localhost' && parsed.port === '5173';
+    } catch {
+      return false;
+    }
+  };
+
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
+    if (allowedPermissions.includes(permission) && isTrustedOrigin(details.requestingUrl)) {
+      callback(true);
+    } else {
+      callback(false);
+    }
+  });
+
+  session.defaultSession.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
+    if (allowedPermissions.includes(permission) && isTrustedOrigin(requestingOrigin)) {
+      return true;
+    }
+    return false;
   });
 
   // Load React app
@@ -116,14 +192,6 @@ ipcMain.on('deactivate-lock', () => {
 });
 
 app.on('ready', () => {
-  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-    if (permission === 'media') {
-      callback(true);
-    } else {
-      callback(false);
-    }
-  });
-
   createWindow();
 });
 
