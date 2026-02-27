@@ -135,14 +135,6 @@ exports.terminateSession = async (req, res) => {
             return res.status(400).json({ message: 'Exam ID is required for termination.' });
         }
 
-        // Add columns if they don't exist yet (safe migration)
-        try {
-            await query(`ALTER TABLE students_exam ADD COLUMN IF NOT EXISTS terminated BOOLEAN DEFAULT false;`);
-            await query(`ALTER TABLE students_exam ADD COLUMN IF NOT EXISTS terminated_at TIMESTAMP;`);
-        } catch (e) {
-            console.error('Migration notice:', e.message);
-        }
-
         const result = await query(`
             UPDATE students_exam 
             SET terminated = true, terminated_at = CURRENT_TIMESTAMP
@@ -177,13 +169,6 @@ exports.requestLastChance = async (req, res) => {
 
         if (!examId) {
             return res.status(400).json({ message: 'Exam ID is required.' });
-        }
-
-        // Add column safely if missing
-        try {
-            await query(`ALTER TABLE students_exam ADD COLUMN IF NOT EXISTS last_chance_used BOOLEAN DEFAULT false;`);
-        } catch (e) {
-            console.error('Migration notice:', e.message);
         }
 
         const client = await pool.connect();
