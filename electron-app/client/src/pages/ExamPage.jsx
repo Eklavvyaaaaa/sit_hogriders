@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Timer from '../components/Timer';
 import QuestionCard from '../components/QuestionCard';
 import MonitoringCamera from '../components/MonitoringCamera';
 import api from '../services/api';
 import { AuthContext } from '../context/AuthContext';
-import { CheckCircle2, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, ShieldCheck, PlayCircle } from 'lucide-react';
 
 const ExamPage = () => {
     const location = useLocation();
@@ -16,21 +16,52 @@ const ExamPage = () => {
 
     const [answers, setAnswers] = useState({});
     const [isSubmitted, setIsSubmitted] = useState(false);
+    const [hasStarted, setHasStarted] = useState(false);
+    const [violationCount, setViolationCount] = useState(0);
+    const removeFocusListenerRef = useRef(null);
 
     useEffect(() => {
         if (!examData) {
             navigate('/join');
+            return;
         }
 
-        // Attempt to enter fullscreen
-        if (!window.electronAPI) {
-            document.documentElement.requestFullscreen().catch(err => {
-                console.warn('Could not enter fullscreen', err);
-            });
-        }
+        // Cleanup on unmount
+        return () => {
+            if (removeFocusListenerRef.current) {
+                removeFocusListenerRef.current();
+            }
+            if (window.electronAPI) {
+                window.electronAPI.deactivateLock();
+            }
+        };
     }, [examData, navigate]);
 
-    if (!examData) return null;
+    const handleStartExam = () => {
+        setHasStarted(true);
+        if (window.electronAPI) {
+            window.electronAPI.activateLock();
+
+            // Start monitoring focus loss
+            removeFocusListenerRef.current = window.electronAPI.onFocusLost(() => {
+                logViolation('Window Focus Lost');
+            });
+        }
+    };
+
+    const logViolation = async (type) => {
+        try {
+            setViolationCount(prev => prev + 1);
+            await api.post('/monitor/log', {
+                examId: examData.examId,
+                type: type,
+                timestamp: new Date().toISOString()
+            });
+            console.warn(`Violation Logged: ${type}`);
+        } catch (err) {
+            console.error('Failed to log violation', err);
+        }
+    };
 
     const handleSelectOption = (qIndex, oIndex) => {
         setAnswers(prev => ({ ...prev, [qIndex]: oIndex }));
@@ -56,14 +87,20 @@ const ExamPage = () => {
             });
             setIsSubmitted(true);
 
-            // Exit fullscreen if possible
-            if (!window.electronAPI && document.fullscreenElement) {
-                document.exitFullscreen();
+            if (window.electronAPI) {
+                window.electronAPI.deactivateLock();
+            }
+
+            if (removeFocusListenerRef.current) {
+                removeFocusListenerRef.current();
+                removeFocusListenerRef.current = null;
             }
         } catch (err) {
             alert('Failed to submit exam');
         }
     };
+
+    if (!examData) return null;
 
     if (isSubmitted) {
         return (
@@ -85,6 +122,38 @@ const ExamPage = () => {
                         className="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-4 rounded-xl transition-colors"
                     >
                         Return to Home
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (!hasStarted) {
+        return (
+            <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+                <div className="bg-slate-800 p-10 rounded-3xl text-center shadow-2xl border border-slate-700 max-w-lg w-full">
+                    <div className="w-24 h-24 bg-blue-900/40 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <ShieldCheck size={50} className="text-blue-500" />
+                    </div>
+                    <h2 className="text-3xl font-bold text-white mb-2">{examData.title}</h2>
+                    <p className="text-slate-400 mb-8">Click the button below to start your exam. This will activate strict monitoring mode.</p>
+
+                    <div className="text-left bg-slate-900/50 p-6 rounded-2xl mb-8 border border-white/5">
+                        <h4 className="text-white font-semibold mb-3">Security Rules:</h4>
+                        <ul className="text-slate-400 text-sm space-y-2 list-disc pl-5">
+                            <li>System will enter Fullscreen mode</li>
+                            <li>External tabs and windows are blocked</li>
+                            <li>Copy/Paste and DevTools are disabled</li>
+                            <li>Losing window focus will be logged as a violation</li>
+                        </ul>
+                    </div>
+
+                    <button
+                        onClick={handleStartExam}
+                        className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-5 rounded-xl transition-all shadow-lg shadow-blue-600/20 transform active:scale-95 flex items-center justify-center space-x-2"
+                    >
+                        <PlayCircle size={24} />
+                        <span>Start Exam</span>
                     </button>
                 </div>
             </div>
@@ -125,7 +194,7 @@ const ExamPage = () => {
                 <div className="absolute bottom-0 left-0 right-0 bg-slate-800/95 backdrop-blur border-t border-slate-700 p-4 shrink-0 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
                     <div className="max-w-3xl mx-auto flex justify-between items-center">
                         <div className="text-slate-400 text-sm">
-                            Answered: <span className="text-white font-bold">{Object.keys(answers).length}</span> / {examData.questions.length}
+                            Answered: <span className="text-white font-bold">{Object.keys(answers).length}</span> / {examData.questions.length} | Violations: <span className="text-red-400">{violationCount}</span>
                         </div>
                         <button
                             onClick={() => {
@@ -160,6 +229,14 @@ const ExamPage = () => {
                             <li>Do not resize or minimize this window</li>
                         </ul>
                     </div>
+
+                    {violationCount > 0 && (
+                        <div className="mt-4 p-3 bg-red-900/20 border border-red-500/30 rounded-lg">
+                            <p className="text-xs text-red-400 font-medium flex items-center italic">
+                                <AlertTriangle size={14} className="mr-2" /> {violationCount} Security alerts logged
+                            </p>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

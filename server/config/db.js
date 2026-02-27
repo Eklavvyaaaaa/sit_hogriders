@@ -1,24 +1,40 @@
-const sqlite3 = require('sqlite3').verbose();
-const { open } = require('sqlite');
-const path = require('path');
+const { Pool } = require('pg');
 
-const dbPath = path.resolve(__dirname, '../database/exam_system.db');
+// Create a connection pool using the Neon PostgreSQL connection string
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
-let db;
-
+/**
+ * Initialize the database by creating all required tables.
+ * Uses PostgreSQL syntax (SERIAL instead of AUTOINCREMENT, TEXT instead of DATETIME).
+ */
 const initDB = async () => {
   try {
-    db = await open({
-      filename: dbPath,
-      driver: sqlite3.Database
-    });
+    // Test the connection
+    const client = await pool.connect();
+    console.log('Connected to Neon PostgreSQL database.');
+    client.release();
 
-    console.log('Connected to the SQLite database.');
+    // Drop existing tables to resolve schema conflicts (UUID vs SERIAL)
+    await pool.query(`
+      DROP TABLE IF EXISTS final_grades CASCADE;
+      DROP TABLE IF EXISTS ati_scores CASCADE;
+      DROP TABLE IF EXISTS pac_scores CASCADE;
+      DROP TABLE IF EXISTS nlp_evaluations CASCADE;
+      DROP TABLE IF EXISTS answers CASCADE;
+      DROP TABLE IF EXISTS monitoring_logs CASCADE;
+      DROP TABLE IF EXISTS submissions CASCADE;
+      DROP TABLE IF EXISTS classrooms CASCADE;
+      DROP TABLE IF EXISTS exams CASCADE;
+      DROP TABLE IF EXISTS users CASCADE;
+    `);
 
     // Create Tables
-    await db.exec(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
         email TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
@@ -26,41 +42,70 @@ const initDB = async () => {
       );
 
       CREATE TABLE IF NOT EXISTS exams (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         title TEXT NOT NULL,
         duration INTEGER NOT NULL,
         questions_json TEXT NOT NULL,
-        teacher_id INTEGER,
-        FOREIGN KEY (teacher_id) REFERENCES users(id)
+        teacher_id INTEGER REFERENCES users(id)
       );
 
       CREATE TABLE IF NOT EXISTS classrooms (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         code TEXT UNIQUE NOT NULL,
-        exam_id INTEGER,
-        teacher_id INTEGER,
-        FOREIGN KEY (exam_id) REFERENCES exams(id),
-        FOREIGN KEY (teacher_id) REFERENCES users(id)
+        exam_id INTEGER REFERENCES exams(id),
+        teacher_id INTEGER REFERENCES users(id)
       );
 
       CREATE TABLE IF NOT EXISTS submissions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        student_id INTEGER,
-        exam_id INTEGER,
+        id SERIAL PRIMARY KEY,
+        student_id INTEGER REFERENCES users(id),
+        exam_id INTEGER REFERENCES exams(id),
         answers_json TEXT NOT NULL,
         score INTEGER,
-        FOREIGN KEY (student_id) REFERENCES users(id),
-        FOREIGN KEY (exam_id) REFERENCES exams(id)
+        status TEXT DEFAULT 'in_progress',
+        submitted_at TIMESTAMP
       );
 
       CREATE TABLE IF NOT EXISTS monitoring_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        exam_id INTEGER,
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        exam_id INTEGER REFERENCES exams(id),
         event_type TEXT NOT NULL,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id),
-        FOREIGN KEY (exam_id) REFERENCES exams(id)
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS answers (
+        id SERIAL PRIMARY KEY,
+        submission_id INTEGER REFERENCES submissions(id),
+        question_id INTEGER,
+        answer_text TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS nlp_evaluations (
+        id SERIAL PRIMARY KEY,
+        answer_id INTEGER UNIQUE REFERENCES answers(id),
+        semantic_score REAL,
+        reasoning_score REAL
+      );
+
+      CREATE TABLE IF NOT EXISTS pac_scores (
+        id SERIAL PRIMARY KEY,
+        answer_id INTEGER UNIQUE REFERENCES answers(id),
+        similarity_score REAL
+      );
+
+      CREATE TABLE IF NOT EXISTS ati_scores (
+        id SERIAL PRIMARY KEY,
+        answer_id INTEGER UNIQUE REFERENCES answers(id),
+        ati_value REAL
+      );
+
+      CREATE TABLE IF NOT EXISTS final_grades (
+        id SERIAL PRIMARY KEY,
+        submission_id INTEGER UNIQUE REFERENCES submissions(id),
+        base_score REAL,
+        trust_factor REAL,
+        final_score REAL
       );
     `);
 
@@ -71,11 +116,12 @@ const initDB = async () => {
   }
 };
 
-const getDB = () => {
-  if (!db) {
-    throw new Error('Database not initialized! Call initDB first.');
-  }
-  return db;
-};
+/**
+ * Execute a query against the PostgreSQL pool.
+ * @param {string} text - SQL query string with $1, $2... placeholders
+ * @param {Array} params - Query parameters
+ * @returns {Promise<import('pg').QueryResult>}
+ */
+const query = (text, params) => pool.query(text, params);
 
-module.exports = { initDB, getDB };
+module.exports = { initDB, query, pool };

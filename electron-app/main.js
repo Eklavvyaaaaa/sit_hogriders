@@ -1,56 +1,34 @@
-const { app, BrowserWindow, globalShortcut } = require('electron');
+const { app, BrowserWindow, globalShortcut, ipcMain } = require('electron');
 const path = require('path');
 const isDev = require('electron-is-dev');
 
 let mainWindow;
+let isLocked = false;
 
 function createWindow() {
-    mainWindow = new BrowserWindow({
-        width: 1200,
-        height: 800,
-        fullscreen: true, // Specific requirement
-        kiosk: true, // Prevents exiting fullscreen
-        alwaysOnTop: true, // Prevents alt-tabbing to other windows easily
-        webPreferences: {
-            nodeIntegration: false,
-            contextIsolation: true,
-            preload: path.join(__dirname, 'preload.js'),
-            devTools: false // Specific requirement
-        }
-    });
-
-    // Load React app
-    const startUrl = process.env.VITE_DEV_SERVER_URL ||
-        (isDev ? 'http://localhost:5173' : \`file://\${path.join(__dirname, 'client/dist/index.html')}\`);
-
-  // Load URL
-  mainWindow.loadURL(startUrl);
-
-  // Security Measures
-  
-  // Disable DevTools
-  mainWindow.webContents.on('devtools-opened', () => {
-    mainWindow.webContents.closeDevTools();
-  });
-
-  // Detect Window Blur (Losing focus)
-  mainWindow.on('blur', () => {
-    mainWindow.webContents.send('window-blur');
-  });
-
-  mainWindow.on('focus', () => {
-    mainWindow.webContents.send('window-focus');
-  });
-
-  // Prevent Navigation to External URLs
-  mainWindow.webContents.on('will-navigate', (event, url) => {
-    if (!url.includes('localhost') && !url.includes('file://')) {
-      event.preventDefault();
+  mainWindow = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    fullscreen: false, // Start in windowed mode
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
+      devTools: true // Enable for now, will be disabled during lock
     }
   });
 
-  mainWindow.webContents.setWindowOpenHandler(() => {
-    return { action: 'deny' }; // Prevent opening new windows/popups
+  // Load React app
+  const startUrl = process.env.VITE_DEV_SERVER_URL ||
+    (isDev ? 'http://localhost:5173' : `file://${path.join(__dirname, 'client/dist/index.html')}`);
+
+  mainWindow.loadURL(startUrl);
+
+  // Monitoring window state
+  mainWindow.on('blur', () => {
+    if (isLocked) {
+      mainWindow.webContents.send('focus-lost');
+    }
   });
 
   mainWindow.on('closed', () => {
@@ -58,33 +36,100 @@ function createWindow() {
   });
 }
 
-// Disable global shortcuts like Copy/Paste (Command+C, Command+V)
+// Security Enforcement Logic
 const registerShortcuts = () => {
   globalShortcut.register('CommandOrControl+C', () => {
-    console.log('Copy disabled');
+    console.log('Copy blocked during exam');
   });
   globalShortcut.register('CommandOrControl+V', () => {
-    console.log('Paste disabled');
+    console.log('Paste blocked during exam');
   });
   globalShortcut.register('CommandOrControl+X', () => {
-    console.log('Cut disabled');
+    console.log('Cut blocked during exam');
   });
-  // Prevent quitting easily except via app logic
-  globalShortcut.register('CommandOrControl+Q', () => {
-    console.log('Quit disabled globally, use app logic.');
-  });
-  // Prevent reloading
   globalShortcut.register('CommandOrControl+R', () => {
-    console.log('Reload disabled');
+    console.log('Reload blocked during exam');
+  });
+  globalShortcut.register('F5', () => {
+    console.log('F5 blocked during exam');
   });
   globalShortcut.register('CommandOrControl+Shift+I', () => {
-    console.log('DevTools disabled');
+    console.log('DevTools blocked during exam');
   });
 };
 
+const unregisterShortcuts = () => {
+  globalShortcut.unregister('CommandOrControl+C');
+  globalShortcut.unregister('CommandOrControl+V');
+  globalShortcut.unregister('CommandOrControl+X');
+  globalShortcut.unregister('CommandOrControl+R');
+  globalShortcut.unregister('F5');
+  globalShortcut.unregister('CommandOrControl+Shift+I');
+};
+
+// IPC Listeners for SmartLock
+ipcMain.on('activate-lock', () => {
+  if (!mainWindow) return;
+
+  isLocked = true;
+
+  // 1. Force Fullscreen and Kiosk mode
+  mainWindow.setFullScreen(true);
+  mainWindow.setKiosk(true);
+  mainWindow.setAlwaysOnTop(true, 'screen-saver');
+  mainWindow.setResizable(false);
+
+  // 2. Disable DevTools
+  mainWindow.webContents.closeDevTools();
+  mainWindow.webContents.on('devtools-opened', () => {
+    mainWindow.webContents.closeDevTools();
+  });
+
+  // 3. Disable Menu Bar
+  mainWindow.setMenuBarVisibility(false);
+
+  // 4. Block Shortcuts
+  registerShortcuts();
+
+  // 5. Prevent Navigation to External URLs
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (isLocked && !url.includes('localhost') && !url.includes('file://')) {
+      event.preventDefault();
+    }
+  });
+
+  // 6. Prevent New Window Creation
+  mainWindow.webContents.setWindowOpenHandler(() => {
+    return { action: 'deny' };
+  });
+
+  console.log('SmartLock Activated');
+});
+
+ipcMain.on('deactivate-lock', () => {
+  if (!mainWindow) return;
+
+  isLocked = false;
+
+  // 1. Exit Fullscreen and Kiosk mode
+  mainWindow.setKiosk(false);
+  mainWindow.setFullScreen(false);
+  mainWindow.setAlwaysOnTop(false);
+  mainWindow.setResizable(true);
+
+  // Restore normal size (optional, could be default)
+  mainWindow.setSize(1200, 800);
+  mainWindow.center();
+
+  // 2. Restore restrictions
+  unregisterShortcuts();
+  mainWindow.setMenuBarVisibility(true);
+
+  console.log('SmartLock Deactivated');
+});
+
 app.on('ready', () => {
   createWindow();
-  registerShortcuts();
 });
 
 app.on('will-quit', () => {
