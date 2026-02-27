@@ -90,6 +90,7 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
     const fatalErrorRef = useRef(false);        // Kill switch: stops loop after fatal crash
     const consecutiveErrorsRef = useRef(0);     // Tracks repeated detection failures
     const isTerminatedRef = useRef(false);
+    const alertsRef = useRef([]);
 
     // Keep callback ref in sync without triggering re-renders
     useEffect(() => {
@@ -176,20 +177,23 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
 
         lastLogTime.current = now;
 
-        setAlerts(prev => {
-            const updatedAlerts = [...prev, { time: new Date(), type: eventType, confidence }];
-            if (updatedAlerts.length >= 10 && !isTerminatedRef.current) {
-                isTerminatedRef.current = true;
-                setIsTerminated(true);
-                stopMonitoring();
-                api.post('/monitor/terminate', { examId })
-                    .then(() => {
-                        window.location.href = `/last-chance?examId=${examId}`;
-                    })
-                    .catch(e => err('Terminate', 'API Error:', e.message));
-            }
-            return updatedAlerts;
-        });
+        const newAlert = { time: new Date(), type: eventType, confidence };
+        const updatedAlerts = [...alertsRef.current, newAlert];
+
+        // Optimistically update ref to prevent race conditions before component re-renders
+        alertsRef.current = updatedAlerts;
+        setAlerts(updatedAlerts);
+
+        if (updatedAlerts.length >= 10 && !isTerminatedRef.current) {
+            isTerminatedRef.current = true;
+            setIsTerminated(true);
+            stopMonitoring();
+            api.post('/monitor/terminate', { examId })
+                .then(() => {
+                    window.location.href = `/last-chance?examId=${examId}`;
+                })
+                .catch(e => err('Terminate', 'API Error:', e.message));
+        }
 
         if (isTerminatedRef.current) return;
 
