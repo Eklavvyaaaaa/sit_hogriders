@@ -2,31 +2,37 @@ import React from 'react';
 
 const QuestionCard = ({ question, index, selectedOption, onSelectOption }) => {
     return (
-        <div className="bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700 mb-6">
-            <h3 className="text-xl text-slate-100 font-semibold mb-6 flex items-start">
-                <span className="text-blue-500 mr-3">Q{index + 1}.</span>
-                {question.text}
+        <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-100 mb-8 font-inter">
+            <h3 className="text-xl text-slate-900 font-bold mb-8 flex items-start">
+                <span className="text-blue-600 mr-4 font-black">Question {index + 1}</span>
             </h3>
 
-            <div className="space-y-3">
+            <p className="text-lg text-slate-800 mb-8 leading-relaxed font-medium">
+                {question.text}
+            </p>
+
+            <div className="space-y-4">
                 {question.options.map((option, i) => (
                     <label
                         key={i}
-                        className={`flex items-center p-4 rounded-lg cursor-pointer transition-colors border ${selectedOption === i ? 'bg-blue-900/40 border-blue-500' : 'bg-slate-700/50 border-transparent hover:bg-slate-700'}`}
+                        className={`flex items-center p-4 rounded-xl cursor-pointer transition-all border-2 ${selectedOption === i ? 'bg-blue-50 border-blue-600' : 'bg-slate-50 border-transparent hover:border-slate-200'}`}
                     >
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mr-4 transition-all ${selectedOption === i ? 'border-blue-600' : 'border-slate-300 bg-white'}`}>
+                            {selectedOption === i && <div className="w-2.5 h-2.5 rounded-full bg-blue-600"></div>}
+                        </div>
                         <input
                             type="radio"
                             name={`question-${index}`}
                             value={i}
                             checked={selectedOption === i}
                             onChange={() => onSelectOption(index, i)}
-                            className="w-4 h-4 text-blue-500 bg-slate-900 border-slate-600 focus:ring-blue-500 focus:ring-2"
+                            className="hidden"
                         />
-                        <span className="ml-3 text-slate-300 text-lg">{option}</span>
+                        <span className={`text-[17px] font-semibold ${selectedOption === i ? 'text-blue-900' : 'text-slate-600'}`}>{option}</span>
                     </label>
                 ))}
             </div>
-        </div >
+        </div>
     );
 };
 

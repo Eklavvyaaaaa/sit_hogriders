@@ -1,6 +1,7 @@
 const { app, BrowserWindow, globalShortcut, ipcMain } = require('electron');
 const path = require('path');
-const isDev = require('electron-is-dev');
+
+const isDev = !app.isPackaged;
 
 let mainWindow;
 let isLocked = false;
