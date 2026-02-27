@@ -31,7 +31,7 @@ const JoinClassroom = () => {
             <Navbar />
             <div className="flex-1 flex flex-col items-center justify-center p-4 relative overflow-hidden">
 
-                <div className="absolute top-1/4 right-0 w-96 h-96 bg-blue-600/10 blur-[100px] rounded-full point-events-none"></div>
+                <div className="absolute top-1/4 right-0 w-96 h-96 bg-blue-600/10 blur-[100px] rounded-full pointer-events-none"></div>
 
                 <div className="bg-slate-800/80 backdrop-blur-xl p-10 rounded-3xl shadow-2xl border border-slate-700/50 max-w-md w-full relative z-10">
                     <div className="text-center mb-8">

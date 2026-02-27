@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { initDB } = require('./config/db');
+const reviewRoutes = require('./routes/reviewRoutes');
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
@@ -22,17 +23,18 @@ app.use('/exam', examRoutes);
 app.use('/classroom', classroomRoutes);
 app.use('/monitor', monitoringRoutes);
 app.use('/submission', submissionRoutes);
+app.use('/api/review', reviewRoutes);
 
 // Database initialization & Server start
 const startServer = async () => {
-    try {
-        await initDB();
-        app.listen(PORT, () => {
-            console.log(`Server is running on port ${PORT}`);
-        });
-    } catch (error) {
-        console.error('Failed to start server:', error);
-    }
+  try {
+    await initDB();
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+  }
 };
 
 startServer();
