@@ -6,14 +6,20 @@ exports.submitAnswer = async (req, res) => {
   const user_id = req.user.id;
 
   try {
-    // Verify ownership
-    const subResult = await query('SELECT student_id FROM submissions WHERE id = $1', [submission_id]);
+    // Verify ownership and status simultaneously
+    const subResult = await query('SELECT student_id, status FROM submissions WHERE id = $1', [submission_id]);
     if (subResult.rows.length === 0) {
       return res.status(404).json({ message: 'Submission not found' });
     }
 
-    if (subResult.rows[0].student_id !== user_id) {
+    const submission = subResult.rows[0];
+
+    if (submission.student_id !== user_id) {
       return res.status(403).json({ message: 'Forbidden: You do not own this submission' });
+    }
+
+    if (submission.status === 'submitted' || submission.status === 'finalized') {
+      return res.status(400).json({ message: 'Submission already finalized' });
     }
 
     const result = await query(

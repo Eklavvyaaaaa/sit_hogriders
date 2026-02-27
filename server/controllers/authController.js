@@ -14,18 +14,20 @@ exports.register = async (req, res) => {
             return res.status(400).json({ message: 'Invalid role' });
         }
 
-        const existingUser = await query('SELECT * FROM users WHERE email = $1', [email]);
-        if (existingUser.rows.length > 0) {
-            return res.status(400).json({ message: 'User already exists' });
-        }
-
         const hashedPassword = await bcrypt.hash(password, 10);
-        const result = await query(
-            'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id',
-            [name, email, hashedPassword, role]
-        );
 
-        res.status(201).json({ message: 'User registered successfully', userId: result.rows[0].id });
+        try {
+            const result = await query(
+                'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id',
+                [name, email, hashedPassword, role]
+            );
+            res.status(201).json({ message: 'User registered successfully', userId: result.rows[0].id });
+        } catch (dbError) {
+            if (dbError.code === '23505') { // PostgreSQL unique violation code
+                return res.status(400).json({ message: 'User already exists' });
+            }
+            throw dbError; // Rethrow other unexpected errors to be caught locally or globally
+        }
     } catch (error) {
         console.error('Registration error:', error);
         res.status(500).json({ message: 'Server error' });
