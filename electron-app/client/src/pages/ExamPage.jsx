@@ -5,7 +5,7 @@ import QuestionCard from '../components/QuestionCard';
 import MonitoringCamera from '../components/MonitoringCamera';
 import api from '../services/api';
 import { AuthContext } from '../context/AuthContext';
-import { CheckCircle2, AlertTriangle, ShieldCheck, PlayCircle } from 'lucide-react';
+import { CheckCircle2, ShieldCheck, PlayCircle, LogIn, ChevronLeft, ChevronRight, Info } from 'lucide-react';
 
 const ExamPage = () => {
     const location = useLocation();
@@ -20,6 +20,7 @@ const ExamPage = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [hasStarted, setHasStarted] = useState(false);
     const [violationCount, setViolationCount] = useState(0);
+    const [currentIndex, setCurrentIndex] = useState(0);
     const removeFocusListenerRef = useRef(null);
     const streamRef = useRef(null);
     const ignoreNextBlur = useRef(false);
@@ -30,6 +31,7 @@ const ExamPage = () => {
             return;
         }
 
+        // Camera pre-fetch from remote logic
         navigator.mediaDevices.getUserMedia({ video: true })
             .then(stream => {
                 streamRef.current = stream;
@@ -37,7 +39,6 @@ const ExamPage = () => {
             .catch(err => {
                 console.error("Camera pre-fetch failed:", err);
             });
-
         return () => {
             if (removeFocusListenerRef.current) {
                 removeFocusListenerRef.current();
@@ -80,7 +81,6 @@ const ExamPage = () => {
                 severity: 'medium',
                 timestamp: new Date().toISOString()
             });
-            console.warn(`Violation Logged: ${type}`);
         } catch (err) {
             console.error('Failed to log violation', err);
         }
@@ -138,15 +138,12 @@ const ExamPage = () => {
                 score
             });
             setIsSubmitted(true);
-
-            if (window.electronAPI) {
-                window.electronAPI.deactivateLock();
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach(t => t.stop());
+                streamRef.current = null;
             }
-
-            if (removeFocusListenerRef.current) {
-                removeFocusListenerRef.current();
-                removeFocusListenerRef.current = null;
-            }
+            if (window.electronAPI) window.electronAPI.deactivateLock();
+            if (removeFocusListenerRef.current) removeFocusListenerRef.current();
         } catch (err) {
             alert('Failed to submit exam');
             setIsSubmitting(false);
@@ -157,24 +154,18 @@ const ExamPage = () => {
 
     if (isSubmitted) {
         return (
-            <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-                <div className="bg-slate-800 p-10 rounded-3xl text-center shadow-2xl border border-slate-700 max-w-lg w-full">
-                    <div className="w-24 h-24 bg-green-900/40 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <CheckCircle2 size={50} className="text-green-500" />
+            <div className="min-h-screen bg-[#f0f7ff] flex items-center justify-center p-4 font-inter">
+                <div className="bg-white p-12 rounded-2xl text-center shadow-xl border border-slate-100 max-w-lg w-full">
+                    <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-8">
+                        <CheckCircle2 size={40} className="text-green-600" />
                     </div>
-                    <h2 className="text-3xl font-bold text-white mb-4">Exam Submitted</h2>
-                    <p className="text-slate-400 mb-8">Your exam has successfully been recorded and submitted. You may close the application now.</p>
+                    <h2 className="text-3xl font-bold text-slate-900 mb-4">Assessment Complete</h2>
+                    <p className="text-slate-500 mb-10 leading-relaxed font-medium">Your responses have been successfully recorded. Results will be released by your instructor.</p>
                     <button
-                        onClick={() => {
-                            if (window.electronAPI) {
-                                window.close();
-                            } else {
-                                navigate('/');
-                            }
-                        }}
-                        className="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-4 rounded-xl transition-colors"
+                        onClick={() => window.electronAPI ? window.close() : navigate('/')}
+                        className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-slate-200"
                     >
-                        Return to Home
+                        Return to Dashboard
                     </button>
                 </div>
             </div>
@@ -183,30 +174,32 @@ const ExamPage = () => {
 
     if (!hasStarted) {
         return (
-            <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-                <div className="bg-slate-800 p-10 rounded-3xl text-center shadow-2xl border border-slate-700 max-w-lg w-full">
-                    <div className="w-24 h-24 bg-blue-900/40 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <ShieldCheck size={50} className="text-blue-500" />
+            <div className="min-h-screen bg-[#f0f7ff] flex items-center justify-center p-4 font-inter">
+                <div className="bg-white p-12 rounded-2xl text-center shadow-xl border border-slate-100 max-w-lg w-full">
+                    <div className="bg-blue-600 p-4 rounded-2xl text-white w-fit mx-auto mb-8 shadow-lg shadow-blue-200">
+                        <ShieldCheck size={36} />
                     </div>
-                    <h2 className="text-3xl font-bold text-white mb-2">{examData.title}</h2>
-                    <p className="text-slate-400 mb-8">Click the button below to start your exam. This will activate strict monitoring mode.</p>
+                    <h2 className="text-2xl font-bold text-slate-800 mb-2">{examData.title}</h2>
+                    <p className="text-slate-500 mb-10 font-medium">Ready to begin your secure assessment?</p>
 
-                    <div className="text-left bg-slate-900/50 p-6 rounded-2xl mb-8 border border-white/5">
-                        <h4 className="text-white font-semibold mb-3">Security Rules:</h4>
-                        <ul className="text-slate-400 text-sm space-y-2 list-disc pl-5">
-                            <li>System will enter Fullscreen mode</li>
-                            <li>External tabs and windows are blocked</li>
-                            <li>Copy/Paste and DevTools are disabled</li>
-                            <li>Losing window focus will be logged as a violation</li>
+                    <div className="text-left bg-slate-50 p-6 rounded-xl mb-10 border border-slate-100">
+                        <h4 className="text-slate-900 font-bold mb-4 flex items-center text-sm uppercase tracking-wider">
+                            <Info size={16} className="mr-2 text-blue-600" />
+                            Security Protocol
+                        </h4>
+                        <ul className="text-slate-500 text-sm space-y-3 font-medium">
+                            <li className="flex items-start"><ChevronRight size={14} className="mr-2 mt-1 text-blue-600 shrink-0" /> Fullscreen mode will be activated</li>
+                            <li className="flex items-start"><ChevronRight size={14} className="mr-2 mt-1 text-blue-600 shrink-0" /> Background applications will be hindered</li>
+                            <li className="flex items-start"><ChevronRight size={14} className="mr-2 mt-1 text-blue-600 shrink-0" /> Copy/paste and system shortcuts disabled</li>
                         </ul>
                     </div>
 
                     <button
                         onClick={handleStartExam}
-                        className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-5 rounded-xl transition-all shadow-lg shadow-blue-600/20 transform active:scale-95 flex items-center justify-center space-x-2"
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-5 rounded-xl transition-all shadow-lg shadow-blue-200 flex items-center justify-center space-x-3 active:scale-[0.98]"
                     >
-                        <PlayCircle size={24} />
-                        <span>Start Exam</span>
+                        <PlayCircle size={22} />
+                        <span>Start Assessment</span>
                     </button>
                 </div>
             </div>
@@ -214,86 +207,123 @@ const ExamPage = () => {
     }
 
     return (
-        <div className="flex h-screen bg-slate-900 overflow-hidden">
-            {/* Left Column: Exam Content */}
-            <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-                <div className="bg-slate-800 shadow-md p-4 border-b border-slate-700 flex justify-between items-center shrink-0 header-glass">
-                    <div className="flex items-center space-x-4">
-                        <div className="bg-indigo-600/20 p-2 rounded-lg text-indigo-400">
-                            <ShieldCheck size={24} />
-                        </div>
-                        <div>
-                            <h1 className="text-xl font-bold text-white">{examData.title}</h1>
-                            <p className="text-sm text-slate-400">Classroom: <span className="font-mono text-blue-400">{classroomCode}</span></p>
-                        </div>
-                    </div>
-                    <Timer durationMinutes={examData.duration} onTimeUp={handleSubmit} />
+        <div className="flex flex-col h-screen bg-[#f0f7ff] font-inter">
+            {/* Top Bar */}
+            <div className="bg-white px-8 py-4 flex justify-between items-center shadow-sm border-b border-slate-100 shrink-0">
+                <div className="flex items-center space-x-4">
+                    <h1 className="text-lg font-bold text-slate-800">{examData.title}</h1>
+                    <span className="text-xs bg-slate-100 px-3 py-1 rounded-full text-slate-500 font-bold uppercase tracking-wider">Assessment In Progress</span>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                    <div className="max-w-3xl mx-auto pb-32">
-                        {examData.questions.map((q, index) => (
-                            <QuestionCard
-                                key={index}
-                                question={q}
-                                index={index}
-                                selectedOption={answers[index]}
-                                onSelectOption={handleSelectOption}
-                                textAnswer={textAnswers[index]}
-                                onTextAnswer={handleTextAnswer}
-                            />
-                        ))}
+                <div className="flex items-center space-x-8">
+                    <div className="flex items-center space-x-3 text-slate-800 font-black text-2xl">
+                        <Timer durationMinutes={examData.duration} onTimeUp={handleSubmit} />
                     </div>
-                </div>
-
-                <div className="absolute bottom-0 left-0 right-0 bg-slate-800/95 backdrop-blur border-t border-slate-700 p-4 shrink-0 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
-                    <div className="max-w-3xl mx-auto flex justify-between items-center">
-                        <div className="text-slate-400 text-sm">
-                            Answered: <span className="text-white font-bold">{getAnsweredCount()}</span> / {examData.questions.length} | Violations: <span className="text-red-400">{violationCount}</span>
-                        </div>
-                        <button
-                            onClick={() => {
-                                if (window.confirm("Are you sure you want to submit? This action is final.")) {
-                                    handleSubmit();
-                                }
-                            }}
-                            disabled={isSubmitting}
-                            className={`px-10 py-3 rounded-xl font-bold transition-all transform active:scale-95 text-white ${isSubmitting ? 'bg-slate-600 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-600/20'}`}
-                        >
-                            {isSubmitting ? 'Submitting...' : 'Submit Exam'}
-                        </button>
+                    <div className="flex items-center px-4 py-2 bg-blue-50 border border-blue-100 rounded-lg">
+                        <span className="text-xs font-bold text-blue-600 uppercase tracking-widest mr-2">Answered</span>
+                        <span className="font-black text-blue-700">{getAnsweredCount()} / {examData.questions.length}</span>
                     </div>
                 </div>
             </div>
 
-            {/* Right Column: Monitoring Sidebar */}
-            <div className="w-80 bg-slate-900 border-l border-slate-800 h-full flex flex-col shrink-0 shadow-2xl relative z-10">
-                <div className="p-4 border-b border-slate-800/50 bg-slate-900/50">
-                    <h2 className="text-lg font-bold text-slate-200">Security Suite</h2>
-                    <p className="text-xs text-slate-500 mt-1 flex items-center"><AlertTriangle size={12} className="mr-1 text-yellow-500" /> Activity is recorded</p>
+            <div className="flex flex-1 overflow-hidden">
+                {/* Main Content (Stepper UI) */}
+                <div className="flex-1 overflow-y-auto p-12 flex flex-col items-center">
+                    <div className="max-w-3xl w-full pb-32">
+                        {examData?.questions && examData.questions.length > 0 && currentIndex >= 0 && currentIndex < examData.questions.length ? (
+                            <QuestionCard
+                                question={examData.questions[currentIndex]}
+                                index={currentIndex}
+                                selectedOption={answers[currentIndex]}
+                                onSelectOption={handleSelectOption}
+                                textAnswer={textAnswers[currentIndex]}
+                                onTextAnswer={handleTextAnswer}
+                            />
+                        ) : (
+                            <div className="p-8 text-center text-slate-500">No question available.</div>
+                        )}
+
+                        <div className="flex justify-between mt-8">
+                            <button
+                                disabled={currentIndex === 0}
+                                onClick={() => setCurrentIndex(prev => prev - 1)}
+                                className="flex items-center space-x-2 px-6 py-3 bg-white border border-slate-200 text-slate-500 rounded-xl font-bold hover:bg-slate-50 disabled:opacity-30 transition-all"
+                            >
+                                <ChevronLeft size={18} />
+                                <span>Previous</span>
+                            </button>
+
+                            {currentIndex < examData.questions.length - 1 ? (
+                                <button
+                                    onClick={() => setCurrentIndex(prev => prev + 1)}
+                                    className="flex items-center space-x-2 px-10 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-md shadow-blue-100 transition-all"
+                                >
+                                    <span>Next Question</span>
+                                    <ChevronRight size={18} />
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => { if (window.confirm("Submit your answers? This action is final.")) handleSubmit(); }}
+                                    disabled={isSubmitting}
+                                    className={`px-10 py-3 rounded-xl font-bold transition-all transform active:scale-95 text-white ${isSubmitting ? 'bg-slate-600 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 shadow-md shadow-green-100'}`}
+                                >
+                                    {isSubmitting ? 'Submitting...' : 'Finish Assessment'}
+                                </button>
+                            )}
+                        </div>
+                    </div>
                 </div>
 
-                <div className="p-4 flex-1 overflow-visible">
-                    <MonitoringCamera examId={examData.examId} stream={streamRef.current} />
-
-                    <div className="mt-6 p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
-                        <h3 className="text-sm font-semibold text-slate-300 mb-2">Instructions</h3>
-                        <ul className="text-xs text-slate-400 space-y-2 list-disc pl-4 marker:text-blue-500">
-                            <li>Keep your face visible at all times</li>
-                            <li>Ensure adequate lighting</li>
-                            <li>Do not look away from the screen for extended periods</li>
-                            <li>Do not resize or minimize this window</li>
-                        </ul>
+                {/* Sidebar Monitoring */}
+                <div className="w-80 bg-white border-l border-slate-100 flex flex-col shrink-0 overflow-hidden shadow-[-4px_0_10px_rgba(0,0,0,0.02)]">
+                    <div className="p-6 border-b border-slate-50">
+                        <h2 className="text-sm font-bold text-slate-800 uppercase tracking-widest flex items-center">
+                            <span className="w-2 h-2 bg-blue-600 rounded-full mr-3 animate-pulse"></span>
+                            Live Monitoring
+                        </h2>
                     </div>
 
-                    {violationCount > 0 && (
-                        <div className="mt-4 p-3 bg-red-900/20 border border-red-500/30 rounded-lg">
-                            <p className="text-xs text-red-400 font-medium flex items-center italic">
-                                <AlertTriangle size={14} className="mr-2" /> {violationCount} Security alerts logged
-                            </p>
+                    <div className="p-6 flex-1 overflow-y-auto space-y-8">
+                        <div className="rounded-2xl border-2 border-slate-100 overflow-hidden shadow-sm bg-slate-50">
+                            <MonitoringCamera examId={examData.examId} stream={streamRef.current} />
                         </div>
-                    )}
+
+                        <div className="space-y-4">
+                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Security Status</h3>
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100">
+                                    <span className="text-xs font-bold text-slate-600">Violations</span>
+                                    <span className={`text-xs font-black px-2 py-0.5 rounded-full ${violationCount > 0 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                                        {violationCount}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100">
+                                    <span className="text-xs font-bold text-slate-600">Window Focus</span>
+                                    <span className="text-[10px] font-black uppercase text-green-600 tracking-tighter">Locked</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-5 bg-blue-50 border border-blue-100 rounded-xl">
+                            <h4 className="text-xs font-bold text-blue-900 mb-2 uppercase tracking-tight">Requirement</h4>
+                            <p className="text-[11px] text-blue-700 leading-relaxed font-medium">Keep your face within range of the camera. Lighting must be adequate.</p>
+                        </div>
+                    </div>
+
+                    <div className="p-4 bg-slate-800 text-white shrink-0">
+                        <h3 className="text-xs font-bold text-slate-400 mb-2">Instructions</h3>
+                        <ul className="text-[10px] space-y-1 opacity-70 list-disc pl-3">
+                            <li>Face must be visible</li>
+                            <li>Adequate lighting</li>
+                            <li>Do not look away</li>
+                        </ul>
+                    </div>
                 </div>
+            </div>
+
+            {/* Warning Bar */}
+            <div className="bg-blue-600 text-white px-8 py-2.5 text-center text-xs font-bold tracking-wide italic">
+                Notice: Switching tabs, windows, or using shortcuts is strictly prohibited and logged in real-time.
             </div>
         </div>
     );
