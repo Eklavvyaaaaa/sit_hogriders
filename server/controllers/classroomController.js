@@ -170,20 +170,13 @@ exports.joinClassroom = async (req, res) => {
             return res.status(403).json({ message: 'You have been flagged and cannot rejoin this exam.' });
         }
 
-        // ── 7. Register student in students_exam junction table ──
-        await query(`
-            INSERT INTO students_exam (student_id, exam_id)
-            VALUES ($1, $2)
-            ON CONFLICT (student_id, exam_id) DO NOTHING
-        `, [studentId, exam.id]);
-
-        const io = getIO();
-
-        // ── 8. Auto-activate exam on first student join (use DB time) ──
+        // ── 7. Auto-activate exam on first student join (use DB time) ──
         const updateResult = await query(
             "UPDATE exams SET status = 'active', end_time = NOW() + ($1 || ' minutes')::INTERVAL WHERE id = $2 AND status = 'scheduled' RETURNING end_time",
             [exam.duration, exam.id]
         );
+
+        const io = getIO();
 
         if (updateResult.rowCount > 0 && io) {
             io.to(`exam:${exam.id}`).emit('exam:statusChange', {
@@ -193,16 +186,7 @@ exports.joinClassroom = async (req, res) => {
             });
         }
 
-        // Emit student joined event
-        if (io) {
-            io.to(`exam:${exam.id}`).emit('student:joined', {
-                studentId,
-                examId: exam.id,
-                timestamp: new Date().toISOString()
-            });
-        }
-
-        // ── 9. Determine authoritative end_time (avoid stale exam.end_time) ──
+        // ── 8. Determine authoritative end_time (avoid stale exam.end_time) ──
         let actualEndTime;
         if (updateResult.rowCount > 0) {
             // This request activated the exam — use the freshly written end_time
@@ -221,7 +205,7 @@ exports.joinClassroom = async (req, res) => {
             }
         }
 
-        // ── 10. Re-run buffer/expiry checks against authoritative end_time using DB time ──
+        // ── 9. Re-run buffer/expiry checks against authoritative end_time using DB time ──
         let remainingDuration = exam.duration;
         if (actualEndTime) {
             const freshCheck = await query(`
@@ -244,6 +228,22 @@ exports.joinClassroom = async (req, res) => {
                 // remaining_seconds comes from DB, so no local clock mismatch
                 remainingDuration = Math.max(1, Math.ceil(remaining_seconds / 60));
             }
+        }
+
+        // ── 10. All validations passed — register student in students_exam ──
+        await query(`
+            INSERT INTO students_exam (student_id, exam_id)
+            VALUES ($1, $2)
+            ON CONFLICT (student_id, exam_id) DO NOTHING
+        `, [studentId, exam.id]);
+
+        // Emit student joined event
+        if (io) {
+            io.to(`exam:${exam.id}`).emit('student:joined', {
+                studentId,
+                examId: exam.id,
+                timestamp: new Date().toISOString()
+            });
         }
 
         // ── 11. Sanitize questions: strip grading fields before sending to student ──

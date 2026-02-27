@@ -23,27 +23,24 @@ const TeacherDashboard = () => {
                 api.get('/exam/my-exams'),
                 api.get('/dashboard/overview')
             ]);
-            let combinedError = null;
-
             if (examsResult.status === 'fulfilled') {
                 setExams(examsResult.value.data);
             } else {
                 console.error('Failed to fetch exams', examsResult.reason);
-                combinedError = 'Failed to load exams. Please try again.';
             }
 
             if (overviewResult.status === 'fulfilled') {
                 setOverview(overviewResult.value.data);
             } else {
                 console.error('Failed to fetch overview', overviewResult.reason);
-                if (!combinedError) combinedError = 'Failed to load overview data. Please try again.';
             }
 
+            // Only block dashboard if both requests failed
             if (examsResult.status === 'rejected' && overviewResult.status === 'rejected') {
-                combinedError = 'Failed to load dashboard data. Please try again.';
+                setError('Failed to load dashboard data. Please try again.');
+            } else {
+                setError(null);
             }
-
-            setError(combinedError);
         } catch (err) {
             console.error('Failed to fetch dashboard data', err);
             setError('Failed to load dashboard data. Please try again.');
