@@ -18,7 +18,7 @@ exports.getStats = async (req, res) => {
             student_counts AS (
                 SELECT 
                     COUNT(DISTINCT student_id) as total_students,
-                    COUNT(*) FILTER (WHERE flagged = true) as flagged_students
+                    COUNT(DISTINCT student_id) FILTER (WHERE flagged = true) as flagged_students
                 FROM students_exam 
                 WHERE exam_id IN (SELECT id FROM teacher_exams)
             ),

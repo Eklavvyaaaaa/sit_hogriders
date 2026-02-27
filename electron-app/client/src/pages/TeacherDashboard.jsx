@@ -11,25 +11,40 @@ const TeacherDashboard = () => {
     const [error, setError] = useState(null);
     const navigate = useNavigate();
 
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                setLoading(true);
-                setError(null);
-                const [examsRes, overviewRes] = await Promise.all([
-                    api.get('/exam/my-exams'),
-                    api.get('/dashboard/overview')
-                ]);
-                setExams(examsRes.data);
-                setOverview(overviewRes.data);
-            } catch (err) {
-                console.error('Failed to fetch dashboard data', err);
-                setError('Failed to load dashboard data. Please try again.');
-            } finally {
-                setLoading(false);
+    const fetchDashboardData = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const [examsResult, overviewResult] = await Promise.allSettled([
+                api.get('/exam/my-exams'),
+                api.get('/dashboard/overview')
+            ]);
+            if (examsResult.status === 'fulfilled') {
+                setExams(examsResult.value.data);
+            } else {
+                console.error('Failed to fetch exams', examsResult.reason);
+                setExams([]);
             }
-        };
-        fetchData();
+            if (overviewResult.status === 'fulfilled') {
+                setOverview(overviewResult.value.data);
+            } else {
+                console.error('Failed to fetch overview', overviewResult.reason);
+                setOverview(null);
+            }
+            // Show error only if both failed
+            if (examsResult.status === 'rejected' && overviewResult.status === 'rejected') {
+                setError('Failed to load dashboard data. Please try again.');
+            }
+        } catch (err) {
+            console.error('Failed to fetch dashboard data', err);
+            setError('Failed to load dashboard data. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchDashboardData();
     }, []);
 
     const handleExportCSV = async (examId) => {
@@ -110,7 +125,7 @@ const TeacherDashboard = () => {
                         <AlertTriangle size={20} className="text-red-400 shrink-0" />
                         <p className="text-red-300">{error}</p>
                         <button
-                            onClick={() => window.location.reload()}
+                            onClick={() => fetchDashboardData()}
                             className="ml-auto text-red-400 hover:text-red-300 text-sm font-medium underline"
                         >
                             Retry

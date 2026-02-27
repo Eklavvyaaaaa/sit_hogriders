@@ -5,6 +5,30 @@ const { getIO } = require('../utils/socketSetup');
 // Configurable join buffer (minutes after exam start)
 const JOIN_BUFFER_MINUTES = 5;
 
+// Fields to strip from questions before sending to students
+const GRADING_FIELDS = ['correctOption', 'correct_option', 'model_answer', 'key_points', 'answer', 'correct_answer', 'grading_rubric'];
+
+/**
+ * Sanitize questions: remove grading-related fields so students don't see answer keys.
+ */
+function sanitizeQuestions(questionsJson) {
+    let questions;
+    try {
+        questions = JSON.parse(questionsJson);
+    } catch {
+        return [];
+    }
+    if (!Array.isArray(questions)) return [];
+
+    return questions.map(q => {
+        const sanitized = { ...q };
+        for (const field of GRADING_FIELDS) {
+            delete sanitized[field];
+        }
+        return sanitized;
+    });
+}
+
 exports.generateClassroom = async (req, res) => {
     try {
         const { examId } = req.body;
@@ -115,16 +139,13 @@ exports.joinClassroom = async (req, res) => {
             }
         }
 
-        // ── 5. Check if the student already submitted ──
+        // ── 5. Check if the student already submitted (deterministic: check for submitted/finalized) ──
         const existingSubmission = await query(
-            'SELECT * FROM submissions WHERE student_id = $1 AND exam_id = $2',
+            "SELECT id, status FROM submissions WHERE student_id = $1 AND exam_id = $2 AND status IN ('submitted', 'finalized') LIMIT 1",
             [studentId, exam.id]
         );
         if (existingSubmission.rows.length > 0) {
-            const sub = existingSubmission.rows[0];
-            if (sub.status === 'submitted' || sub.status === 'finalized') {
-                return res.status(403).json({ message: 'You have already submitted this exam' });
-            }
+            return res.status(403).json({ message: 'You have already submitted this exam' });
         }
 
         // ── 6. Check if the student is flagged/terminated ──
@@ -169,20 +190,33 @@ exports.joinClassroom = async (req, res) => {
             });
         }
 
+        // ── 9. Determine authoritative end_time (avoid stale exam.end_time) ──
+        let actualEndTime;
+        if (updateResult.rowCount > 0) {
+            // This request activated the exam — use the freshly written end_time
+            actualEndTime = updateResult.rows[0].end_time;
+        } else {
+            // Another request may have activated it — re-query for the latest end_time
+            const freshExam = await query('SELECT end_time FROM exams WHERE id = $1', [exam.id]);
+            actualEndTime = freshExam.rows.length > 0 ? freshExam.rows[0].end_time : null;
+        }
+
         // Calculate remaining duration for late joiners
         let remainingDuration = exam.duration;
-        const actualEndTime = exam.end_time || (updateResult.rows.length > 0 ? updateResult.rows[0].end_time : null);
         if (actualEndTime) {
             const msRemaining = new Date(actualEndTime).getTime() - Date.now();
             remainingDuration = Math.max(1, Math.ceil(msRemaining / 60000)); // At least 1 minute
         }
+
+        // ── 10. Sanitize questions: strip grading fields before sending to student ──
+        const sanitizedQuestions = sanitizeQuestions(exam.questions_json);
 
         res.json({
             message: 'Joined successfully',
             examId: exam.id,
             title: exam.title,
             duration: remainingDuration,
-            questions: JSON.parse(exam.questions_json),
+            questions: sanitizedQuestions,
             endTime: actualEndTime
         });
 
