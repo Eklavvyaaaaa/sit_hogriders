@@ -79,11 +79,7 @@ const JoinClassroom = () => {
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
         const date = new Date(dateString);
-<<<<<<< HEAD
         return date.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', month: 'short', day: '2-digit', year: 'numeric' });
-=======
-        return date.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
->>>>>>> d779e8544c9cb639a7dd66c4f5986c5c8403f16c
     };
 
     const isComplete = code.join('').length === 6;
@@ -170,13 +166,8 @@ const JoinClassroom = () => {
                                                 onClick={() => { if (canNavigate) navigate(`/history/submission/${exam.submission_id}`); }}
                                                 disabled={!canNavigate}
                                                 className={`group relative flex items-center justify-between bg-white rounded-2xl p-5 border border-slate-200 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] transition-all duration-300 overflow-hidden text-left w-full ${canNavigate
-<<<<<<< HEAD
                                                     ? 'hover:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.1)] hover:border-blue-300 cursor-pointer'
                                                     : 'opacity-70 cursor-default'
-=======
-                                                        ? 'hover:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.1)] hover:border-blue-300 cursor-pointer'
-                                                        : 'opacity-70 cursor-default'
->>>>>>> d779e8544c9cb639a7dd66c4f5986c5c8403f16c
                                                     }`}
                                             >
                                                 {/* Left structural visual */}

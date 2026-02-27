@@ -7,24 +7,16 @@ import ChatBox from '../components/ChatBox';
 
 const MonitorDashboard = () => {
   const { examId } = useParams();
-<<<<<<< HEAD
-  const navigate = useNavigate();
-=======
   const location = useLocation();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(location.state?.tab || 'live');
->>>>>>> d779e8544c9cb639a7dd66c4f5986c5c8403f16c
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [examStats, setExamStats] = useState(null);
 
   const fetchLogs = async () => {
     try {
-<<<<<<< HEAD
-      const res = await api.get(`/monitor/${examId}`);
-=======
       const res = await api.get(`/monitor/logs/${examId}`);
->>>>>>> d779e8544c9cb639a7dd66c4f5986c5c8403f16c
       setLogs(res.data);
     } catch (err) {
       console.error(err);
@@ -180,53 +172,6 @@ const MonitorDashboard = () => {
           </div>
         )}
 
-<<<<<<< HEAD
-        <div className="bg-slate-800 rounded-3xl overflow-hidden shadow-2xl border border-slate-700">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-900/50 text-slate-400 uppercase text-xs tracking-wider border-b border-slate-700">
-                  <th className="p-6 font-semibold">Timestamp</th>
-                  <th className="p-6 font-semibold">Student Name</th>
-                  <th className="p-6 font-semibold">Email</th>
-                  <th className="p-6 font-semibold">Suspicious Event</th>
-                  <th className="p-6 font-semibold">Severity</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-700/50">
-                {logs.length === 0 ? (
-                  <tr>
-                    <td colSpan="5" className="p-12 text-center text-slate-500">
-                      <div className="flex flex-col items-center justify-center">
-                        <div className="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center mb-4 border border-slate-800">
-                          <ShieldAlert size={24} className="text-slate-700" />
-                        </div>
-                        <p className="text-lg font-medium">No suspicious activity detected yet.</p>
-                        <p className="text-sm">Logs will appear here in real-time.</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  logs.map(log => (
-                    <tr key={log.id} className="hover:bg-slate-800/80 transition-colors group">
-                      <td className="p-6 text-slate-400 whitespace-nowrap">
-                        <span className="bg-slate-900 px-3 py-1 rounded-lg border border-slate-800 font-mono text-sm">
-                          {new Date(log.timestamp).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
-                        </span>
-                      </td>
-                      <td className="p-6 text-white font-medium">{log.student_name}</td>
-                      <td className="p-6 text-slate-400">{log.student_email}</td>
-                      <td className="p-6">
-                        <div className="inline-flex items-center space-x-2 bg-red-900/20 text-red-200 px-3 py-1.5 rounded-lg border border-red-900/50">
-                          {getEventIcon(log.event_type)}
-                          <span className="font-medium text-sm">{log.event_type}</span>
-                        </div>
-                      </td>
-                      <td className="p-6">
-                        <span className={`text-xs px-3 py-1.5 rounded-lg border font-medium capitalize ${getSeverityBadge(log.severity)}`}>
-                          {log.severity || 'medium'}
-                        </span>
-=======
         <div className="flex space-x-6 border-b border-slate-800 mb-6">
           <button
             onClick={() => setActiveTab('live')}
@@ -304,7 +249,6 @@ const MonitorDashboard = () => {
                           <p className="text-lg font-medium">No suspicious activity detected yet.</p>
                           <p className="text-sm">Logs will appear here in real-time.</p>
                         </div>
->>>>>>> d779e8544c9cb639a7dd66c4f5986c5c8403f16c
                       </td>
                     </tr>
                   ) : (
@@ -312,7 +256,7 @@ const MonitorDashboard = () => {
                       <tr key={log.id} className="hover:bg-slate-800/80 transition-colors group">
                         <td className="p-6 text-slate-400 whitespace-nowrap">
                           <span className="bg-slate-900 px-3 py-1 rounded-lg border border-slate-800 font-mono text-sm">
-                            {new Date(log.timestamp).toLocaleString()}
+                            {new Date(log.timestamp).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
                           </span>
                         </td>
                         <td className="p-6 text-white font-medium">{log.student_name}</td>

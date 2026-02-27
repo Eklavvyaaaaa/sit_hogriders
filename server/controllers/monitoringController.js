@@ -124,8 +124,6 @@ exports.getLogs = async (req, res) => {
         console.error('Get logs error:', error);
         res.status(500).json({ message: 'Server error' });
     }
-<<<<<<< HEAD
-=======
 };
 
 exports.terminateSession = async (req, res) => {
@@ -230,5 +228,4 @@ exports.requestLastChance = async (req, res) => {
         console.error('Last chance error:', error);
         res.status(500).json({ message: 'Server error' });
     }
->>>>>>> d779e8544c9cb639a7dd66c4f5986c5c8403f16c
 };

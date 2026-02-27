@@ -292,13 +292,6 @@ exports.getExamStats = async (req, res) => {
             return res.status(403).json({ message: 'Unauthorized' });
         }
 
-<<<<<<< HEAD
-        const studentsJoined = await query('SELECT COUNT(*) as count FROM students_exam WHERE exam_id = $1', [id]);
-        const submissionsCount = await query('SELECT COUNT(*) as count FROM submissions WHERE exam_id = $1', [id]);
-        const violationCount = await query('SELECT COUNT(*) as count FROM monitoring_logs WHERE exam_id = $1', [id]);
-        const flaggedCount = await query('SELECT COUNT(*) as count FROM students_exam WHERE exam_id = $1 AND flagged = true', [id]);
-
-=======
         const studentsJoined = await query('SELECT COUNT(DISTINCT student_id) as count FROM submissions WHERE exam_id = $1', [id]);
         const submissionsCount = await query('SELECT COUNT(*) as count FROM submissions WHERE exam_id = $1 AND status = $2', [id, 'submitted']);
         const violationCount = await query('SELECT COUNT(*) as count FROM monitoring_logs WHERE exam_id = $1', [id]);
@@ -319,18 +312,13 @@ exports.getExamStats = async (req, res) => {
             ORDER BY u.name ASC
         `, [id]);
 
->>>>>>> d779e8544c9cb639a7dd66c4f5986c5c8403f16c
         res.json({
             studentsJoined: parseInt(studentsJoined.rows[0].count),
             submissions: parseInt(submissionsCount.rows[0].count),
             violations: parseInt(violationCount.rows[0].count),
             flaggedStudents: parseInt(flaggedCount.rows[0].count),
-<<<<<<< HEAD
-            exam: examResult.rows[0]
-=======
             exam: examResult.rows[0],
             studentsList: studentsList.rows
->>>>>>> d779e8544c9cb639a7dd66c4f5986c5c8403f16c
         });
     } catch (error) {
         console.error('Exam stats error:', error);
