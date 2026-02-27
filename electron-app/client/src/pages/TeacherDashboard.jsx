@@ -123,13 +123,21 @@ const TeacherDashboard = () => {
     };
 
     const handleReschedule = async (examId) => {
-        const input = prompt('Enter new scheduled time (e.g. 2026-03-01T10:00):');
+        const input = prompt('Enter new scheduled time with timezone (e.g. 2026-03-01T10:00-08:00 or 2026-03-01T18:00Z):');
         if (!input) return;
-        const parsedDate = new Date(input);
-        if (isNaN(parsedDate.getTime())) {
-            alert('Please enter a valid date/time format.');
+
+        const iso8601Regex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/;
+        if (!iso8601Regex.test(input)) {
+            alert('Please enter a valid ISO-8601 date/time with an explicit timezone (e.g., 2026-03-01T10:00-08:00 or 2026-03-01T18:00Z).');
             return;
         }
+
+        const parsedDate = new Date(input);
+        if (isNaN(parsedDate.getTime())) {
+            alert('Invalid date. Please ensure the date/time format is correct.');
+            return;
+        }
+
         try {
             await api.patch(`/exam/${examId}/reschedule`, { new_time: parsedDate.toISOString() });
             alert('Exam rescheduled successfully.');
