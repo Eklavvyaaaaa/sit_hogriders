@@ -1,117 +1,103 @@
-import os
 from flask import Flask, request, jsonify
 from content_module import calculate_cis
 from pattern_module import calculate_pcs
+import logging
 
 app = Flask(__name__)
 
+logging.basicConfig(level=logging.INFO)
 
-# ----------------------------------
-# Content Integrity Endpoint
-# ----------------------------------
+MAX_LENGTH = 5000
+
+
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({"status": "ATI engine running"}), 200
+
+
 @app.route("/evaluate-cis", methods=["POST"])
 def evaluate_cis():
-    data = request.get_json(silent=True)
+    try:
+        data = request.get_json()
 
-    if data is None or not isinstance(data, dict):
-        return jsonify({"error": "Invalid or missing JSON payload"}), 400
+        if not data:
+            return jsonify({"error": "No input data provided"}), 400
 
-    student_answer = data.get("student_answer", "")
-    model_answer = data.get("model_answer", "")
-    key_points = data.get("key_points", [])
+        student_answer = data.get("student_answer", "")
+        model_answer = data.get("model_answer", "")
+        key_points = data.get("key_points", [])
 
-    if not student_answer or not model_answer:
-        return jsonify({"error": "Missing required fields"}), 400
+        if not student_answer or not model_answer:
+            return jsonify({"error": "Missing required fields"}), 400
 
-    result = calculate_cis(student_answer, model_answer, key_points)
+        if len(student_answer) > MAX_LENGTH:
+            return jsonify({"error": "Answer too long"}), 400
 
-    return jsonify(result)
+        result = calculate_cis(student_answer, model_answer, key_points)
+
+        return jsonify(result)
+
+    except Exception as e:
+        logging.exception("CIS processing failed")
+        return jsonify({"error": "CIS processing failed"}), 500
 
 
-# ----------------------------------
-# Full ATI Endpoint
-# ----------------------------------
 @app.route("/evaluate-ati", methods=["POST"])
 def evaluate_ati():
-    data = request.get_json(silent=True)
-
-    if data is None or not isinstance(data, dict):
-        return jsonify({"error": "Invalid or missing JSON payload"}), 400
-
-    student_answer = data.get("student_answer", "")
-    model_answer = data.get("model_answer", "")
-    key_points = data.get("key_points", [])
-    
-    # Robust visual_score validation and clamping
-    raw_visual_score = data.get("visual_score", 100)
     try:
-        visual_score_validated = float(raw_visual_score)
-    except (TypeError, ValueError):
-        visual_score_validated = 100.0
-    
-    # Clamp to 0-100
-    visual_score_validated = max(0.0, min(visual_score_validated, 100.0))
+        logging.info("ATI evaluation requested")
 
-    if not student_answer or not model_answer:
-        return jsonify({"error": "Missing required fields"}), 400
+        data = request.get_json()
 
-    # -------------------------
-    # Step 1: Content Score
-    # -------------------------
-    cis_result = calculate_cis(student_answer, model_answer, key_points)
-    content_score = cis_result["content_integrity_score"]
+        if not data:
+            return jsonify({"error": "No input data provided"}), 400
 
-    # -------------------------
-    # Step 2: Pattern Score
-    # -------------------------
-    pattern_score = calculate_pcs(student_answer, model_answer)
+        student_answer = data.get("student_answer", "")
+        model_answer = data.get("model_answer", "")
+        key_points = data.get("key_points", [])
+        visual_score = data.get("visual_score", 100)
 
-    # -------------------------
-    # Step 3: ATI Calculation
-    # -------------------------
-    # Weights:
-    # Content = 50%
-    # Visual  = 30%
-    # Pattern = 20%
-    ati_score = (
-        0.5 * content_score +
-        0.3 * visual_score_validated +
-        0.2 * pattern_score
-    )
+        if not student_answer or not model_answer:
+            return jsonify({"error": "Missing required fields"}), 400
 
-    ati_score = round(ati_score, 2)
+        if len(student_answer) > MAX_LENGTH:
+            return jsonify({"error": "Answer too long"}), 400
 
-    # -------------------------
-    # Step 4: Trust Classification
-    # -------------------------
-    if ati_score >= 80:
-        trust_level = "Highly Trustworthy"
-    elif ati_score >= 55:
-        trust_level = "Moderately Trustworthy"
-    else:
-        trust_level = "Low Trust"
+        # Content Score
+        cis_result = calculate_cis(student_answer, model_answer, key_points)
+        content_score = cis_result["content_integrity_score"]
 
-    return jsonify({
-        "ati_score": ati_score,
-        "content_score": content_score,
-        "visual_score": visual_score_validated,
-        "pattern_score": pattern_score,
-        "trust_level": trust_level
-    })
+        # Pattern Score
+        pattern_score = calculate_pcs(student_answer, model_answer)
+
+        # ATI Calculation
+        ati_score = (
+            0.5 * content_score +
+            0.3 * visual_score +
+            0.2 * pattern_score
+        )
+
+        ati_score = round(ati_score, 2)
+
+        if ati_score >= 80:
+            trust_level = "Highly Trustworthy"
+        elif ati_score >= 55:
+            trust_level = "Moderately Trustworthy"
+        else:
+            trust_level = "Low Trust"
+
+        return jsonify({
+            "ati_score": ati_score,
+            "content_score": content_score,
+            "pattern_score": pattern_score,
+            "visual_score": visual_score,
+            "trust_level": trust_level
+        })
+
+    except Exception as e:
+        logging.exception("ATI processing failed")
+        return jsonify({"error": "ATI processing failed"}), 500
 
 
-# ----------------------------------
-# Run Server
-# ----------------------------------
 if __name__ == "__main__":
-    # Safe environment-based configuration
-    host = os.environ.get("HOST", "127.0.0.1")
-    port = int(os.environ.get("PORT", 8000))
-    debug_mode = os.environ.get("DEBUG", "False").lower() in ("true", "1", "t")
-
-    # Security safeguard: don't allow debug mode when binding to all interfaces
-    if host == "0.0.0.0" and debug_mode:
-        print("WARNING: Debug mode disabled for security (host=0.0.0.0)")
-        debug_mode = False
-
-    app.run(host=host, port=port, debug=debug_mode)
+    app.run(host="0.0.0.0", port=8000, debug=True)
