@@ -101,26 +101,28 @@ export const useMonitoring = (examId) => {
             sendLog('Window blur / loss of focus detected');
         };
 
-        if (window.electronAPI) {
-            window.electronAPI.onWindowBlur(handleBlur);
+        let removeListener = null;
+
+        if (window.electronAPI && window.electronAPI.onFocusLost) {
+            removeListener = window.electronAPI.onFocusLost(handleBlur);
         } else {
             // Fallback for non-electron env testing
             window.addEventListener('blur', handleBlur);
         }
 
         return () => {
-            if (window.electronAPI) {
-                window.electronAPI.removeBlurListeners();
+            if (removeListener) {
+                removeListener();
             } else {
                 window.removeEventListener('blur', handleBlur);
             }
         };
     }, [isMonitoring, sendLog]);
 
-    const startMonitoring = async (videoElement) => {
+    const startMonitoring = async (videoElement, existingStream = null) => {
         videoRef.current = videoElement;
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            const stream = existingStream || await navigator.mediaDevices.getUserMedia({ video: true });
             videoElement.srcObject = stream;
             streamRef.current = stream;
 
