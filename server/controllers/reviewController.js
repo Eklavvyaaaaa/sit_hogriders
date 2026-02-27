@@ -1,4 +1,4 @@
-const pool = require('../config/db');
+const { pool } = require('../config/db');
 
 exports.getExamReview = async (req, res) => {
     const { exam_id } = req.params;

@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import api from '../services/api';
-import { Plus, Trash2, Save, Users, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Plus, Trash2, Save, Users, ToggleLeft, ToggleRight, Loader2 } from 'lucide-react';
 
 const CreateExam = () => {
     const [title, setTitle] = useState('');
     const [duration, setDuration] = useState(60);
+    const [isSaving, setIsSaving] = useState(false);
     const [questions, setQuestions] = useState([
         { text: '', type: 'mcq', options: ['', '', '', ''], correctOption: 0, model_answer: '', key_points: [''] }
     ]);
@@ -85,6 +86,7 @@ const CreateExam = () => {
 
     const isFormValid = () => {
         if (!title) return false;
+        if (!Number.isInteger(duration) || duration < 1) return false;
         return questions.every(q => {
             if (!q.text) return false;
             if (q.type === 'mcq') {
@@ -96,6 +98,8 @@ const CreateExam = () => {
     };
 
     const handleSave = async () => {
+        if (isSaving) return;
+        setIsSaving(true);
         try {
             const examRes = await api.post('/exam/create', { title, duration, questions });
             const examId = examRes.data.examId;
@@ -104,30 +108,39 @@ const CreateExam = () => {
         } catch (err) {
             console.error(err);
             alert('Failed to create exam');
+        } finally {
+            setIsSaving(false);
         }
     };
 
+    const handleDurationChange = (e) => {
+        const raw = e.target.value;
+        if (raw === '') { setDuration(''); return; }
+        const parsed = parseInt(raw, 10);
+        if (!isNaN(parsed) && parsed >= 1) setDuration(parsed);
+    };
+
     return (
-        <div className="min-h-screen bg-slate-900 flex flex-col">
+        <div className="min-h-screen bg-white flex flex-col font-inter">
             <Navbar />
             <div className="flex-1 max-w-4xl w-full mx-auto p-8">
 
                 {classroomCode ? (
-                    <div className="bg-slate-800 p-10 rounded-3xl text-center shadow-2xl border border-slate-700 relative overflow-hidden">
-                        <div className="absolute inset-x-0 top-0 h-2 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
-                        <div className="w-20 h-20 bg-blue-600/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <Users size={40} className="text-blue-500" />
+                    <div className="bg-white p-10 rounded-2xl text-center shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] border border-slate-200 relative overflow-hidden">
+                        <div className="absolute inset-x-0 top-0 h-1.5 bg-blue-600"></div>
+                        <div className="w-16 h-16 bg-blue-50 rounded-xl flex items-center justify-center mx-auto mb-6">
+                            <Users size={32} className="text-blue-600" />
                         </div>
-                        <h2 className="text-3xl font-bold text-white mb-2">Classroom Generated!</h2>
-                        <p className="text-slate-400 mb-8">Share this code with your students to let them join the exam.</p>
+                        <h2 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Classroom Generated!</h2>
+                        <p className="text-slate-500 mb-8 font-medium">Share this code with your students to let them join the exam.</p>
 
-                        <div className="bg-slate-900 inline-block px-10 py-5 rounded-2xl border border-slate-700 shadow-inner mb-8">
-                            <span className="text-6xl font-mono tracking-[0.5em] text-blue-400 font-extrabold">{classroomCode}</span>
+                        <div className="bg-slate-50 inline-block px-10 py-5 rounded-xl border border-slate-200 mb-8">
+                            <span className="text-5xl font-mono tracking-[0.5em] text-blue-600 font-black">{classroomCode}</span>
                         </div>
                         <div>
                             <button
                                 onClick={() => navigate('/teacher')}
-                                className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-xl shadow-lg transition-colors"
+                                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-xl shadow-blue-200 transition-all active:scale-[0.98]"
                             >
                                 Back to Dashboard
                             </button>
@@ -136,43 +149,48 @@ const CreateExam = () => {
                 ) : (
                     <>
                         <div className="mb-8">
-                            <h1 className="text-3xl font-bold text-white mb-2">Create New Exam</h1>
-                            <p className="text-slate-400">Configure exam details and add questions. Supports both MCQ and subjective questions.</p>
+                            <p className="text-[11px] font-black text-blue-600 uppercase tracking-widest mb-1">Teacher Portal</p>
+                            <h1 className="text-3xl font-black text-slate-900 tracking-tighter mb-1">Create New Exam</h1>
+                            <p className="text-slate-500 text-sm font-medium">Configure exam details and add questions. Supports both MCQ and subjective questions.</p>
                         </div>
 
-                        <div className="bg-slate-800 rounded-2xl p-6 shadow-xl border border-slate-700 mb-8 space-y-6">
+                        {/* Exam Details */}
+                        <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] mb-6 space-y-5">
                             <div>
-                                <label className="block text-slate-400 text-sm font-semibold mb-2">Exam Title</label>
+                                <label className="block text-[11px] text-slate-500 font-black uppercase tracking-widest mb-2">Exam Title</label>
                                 <input
                                     type="text"
-                                    className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-white"
+                                    className="w-full p-3.5 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-blue-600 focus:bg-white focus:ring-0 transition-all text-slate-900 placeholder-slate-400 font-medium"
                                     placeholder="E.g. Final Computer Science Midterm"
                                     value={title}
                                     onChange={e => setTitle(e.target.value)}
                                 />
                             </div>
                             <div>
-                                <label className="block text-slate-400 text-sm font-semibold mb-2">Duration (minutes)</label>
+                                <label className="block text-[11px] text-slate-500 font-black uppercase tracking-widest mb-2">Duration (minutes)</label>
                                 <input
                                     type="number"
-                                    className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-white"
+                                    min="1"
+                                    step="1"
+                                    className="w-full p-3.5 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-blue-600 focus:bg-white focus:ring-0 transition-all text-slate-900 placeholder-slate-400 font-medium"
                                     value={duration}
-                                    onChange={e => setDuration(Number(e.target.value))}
+                                    onChange={handleDurationChange}
                                 />
                             </div>
                         </div>
 
-                        <div className="space-y-6">
+                        {/* Questions */}
+                        <div className="space-y-5">
                             {questions.map((q, qIndex) => (
-                                <div key={qIndex} className="bg-slate-800 rounded-2xl p-6 shadow-xl border border-slate-700 relative">
+                                <div key={qIndex} className="bg-white rounded-xl p-6 border border-slate-200 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] relative">
                                     <div className="flex justify-between items-start mb-4">
                                         <div className="flex items-center space-x-3">
-                                            <h3 className="text-lg font-semibold text-slate-300">Question {qIndex + 1}</h3>
+                                            <h3 className="text-base font-black text-slate-900">Question {qIndex + 1}</h3>
                                             <button
                                                 onClick={() => toggleQuestionType(qIndex)}
-                                                className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors border ${q.type === 'subjective'
-                                                    ? 'bg-purple-900/30 text-purple-400 border-purple-900/50'
-                                                    : 'bg-blue-900/30 text-blue-400 border-blue-900/50'
+                                                className={`flex items-center space-x-1.5 px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-widest transition-colors border ${q.type === 'subjective'
+                                                    ? 'bg-indigo-50 text-indigo-600 border-indigo-200'
+                                                    : 'bg-blue-50 text-blue-600 border-blue-200'
                                                     }`}
                                             >
                                                 {q.type === 'subjective' ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
@@ -180,34 +198,38 @@ const CreateExam = () => {
                                             </button>
                                         </div>
                                         {questions.length > 1 && (
-                                            <button onClick={() => removeQuestion(qIndex)} className="text-red-400 hover:text-red-300 p-2">
-                                                <Trash2 size={18} />
+                                            <button
+                                                onClick={() => removeQuestion(qIndex)}
+                                                className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                                                aria-label={`Delete question ${qIndex + 1}`}
+                                                title={`Delete question ${qIndex + 1}`}
+                                            >
+                                                <Trash2 size={16} />
                                             </button>
                                         )}
                                     </div>
 
                                     <textarea
-                                        className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-white mb-4 min-h-[100px]"
+                                        className="w-full p-3.5 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-blue-600 focus:bg-white focus:ring-0 transition-all text-slate-900 placeholder-slate-400 font-medium mb-4 min-h-[90px]"
                                         placeholder="Enter question text..."
                                         value={q.text}
                                         onChange={e => updateQuestion(qIndex, 'text', e.target.value)}
                                     />
 
                                     {q.type === 'mcq' ? (
-                                        /* MCQ Options */
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                             {q.options.map((opt, oIndex) => (
-                                                <div key={oIndex} className="flex items-center space-x-3">
+                                                <div key={oIndex} className="flex items-center space-x-2.5">
                                                     <input
                                                         type="radio"
                                                         name={`correct-${qIndex}`}
                                                         checked={q.correctOption === oIndex}
                                                         onChange={() => updateQuestion(qIndex, 'correctOption', oIndex)}
-                                                        className="w-4 h-4 text-blue-500 bg-slate-900 border-slate-600 focus:ring-blue-500"
+                                                        className="w-4 h-4 text-blue-600 bg-white border-slate-300 focus:ring-blue-500"
                                                     />
                                                     <input
                                                         type="text"
-                                                        className="flex-1 p-2 bg-slate-900 border border-slate-700 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-white text-sm"
+                                                        className="flex-1 p-2.5 bg-slate-50 border-2 border-slate-100 rounded-lg focus:border-blue-600 focus:bg-white focus:ring-0 transition-all text-slate-900 text-sm font-medium placeholder-slate-400"
                                                         placeholder={`Option ${oIndex + 1}`}
                                                         value={opt}
                                                         onChange={e => updateQuestionOption(qIndex, oIndex, e.target.value)}
@@ -216,26 +238,25 @@ const CreateExam = () => {
                                             ))}
                                         </div>
                                     ) : (
-                                        /* Subjective: Model Answer + Key Points */
                                         <div className="space-y-4">
                                             <div>
-                                                <label className="block text-slate-400 text-xs font-semibold mb-2 uppercase tracking-wider">Model Answer</label>
+                                                <label className="block text-[10px] text-slate-400 font-black mb-2 uppercase tracking-widest">Model Answer</label>
                                                 <textarea
-                                                    className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl focus:border-purple-500 focus:ring-1 focus:ring-purple-500 text-white min-h-[80px]"
+                                                    className="w-full p-3.5 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 focus:bg-white focus:ring-0 transition-all text-slate-900 font-medium min-h-[80px] placeholder-slate-400"
                                                     placeholder="Enter the ideal/expected answer..."
                                                     value={q.model_answer}
                                                     onChange={e => updateQuestion(qIndex, 'model_answer', e.target.value)}
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-slate-400 text-xs font-semibold mb-2 uppercase tracking-wider">Key Points</label>
+                                                <label className="block text-[10px] text-slate-400 font-black mb-2 uppercase tracking-widest">Key Points</label>
                                                 <div className="space-y-2">
                                                     {q.key_points.map((kp, kpIndex) => (
                                                         <div key={kpIndex} className="flex items-center space-x-2">
-                                                            <span className="text-purple-400 text-xs font-mono w-6">{kpIndex + 1}.</span>
+                                                            <span className="text-indigo-500 text-xs font-mono w-5 font-black">{kpIndex + 1}.</span>
                                                             <input
                                                                 type="text"
-                                                                className="flex-1 p-2 bg-slate-900 border border-slate-700 rounded-lg focus:border-purple-500 focus:ring-1 focus:ring-purple-500 text-white text-sm"
+                                                                className="flex-1 p-2.5 bg-slate-50 border-2 border-slate-100 rounded-lg focus:border-indigo-500 focus:bg-white focus:ring-0 transition-all text-slate-900 text-sm font-medium placeholder-slate-400"
                                                                 placeholder={`Key point ${kpIndex + 1}`}
                                                                 value={kp}
                                                                 onChange={e => updateKeyPoint(qIndex, kpIndex, e.target.value)}
@@ -243,7 +264,9 @@ const CreateExam = () => {
                                                             {q.key_points.length > 1 && (
                                                                 <button
                                                                     onClick={() => removeKeyPoint(qIndex, kpIndex)}
-                                                                    className="text-red-400 hover:text-red-300 p-1"
+                                                                    className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"
+                                                                    aria-label={`Remove key point ${kpIndex + 1} from question ${qIndex + 1}`}
+                                                                    title={`Remove key point ${kpIndex + 1}`}
                                                                 >
                                                                     <Trash2 size={14} />
                                                                 </button>
@@ -252,7 +275,7 @@ const CreateExam = () => {
                                                     ))}
                                                     <button
                                                         onClick={() => addKeyPoint(qIndex)}
-                                                        className="text-purple-400 hover:text-purple-300 text-xs font-medium flex items-center space-x-1 mt-1"
+                                                        className="text-indigo-600 hover:text-indigo-700 text-xs font-bold flex items-center space-x-1 mt-1"
                                                     >
                                                         <Plus size={12} />
                                                         <span>Add Key Point</span>
@@ -265,18 +288,19 @@ const CreateExam = () => {
                             ))}
                         </div>
 
+                        {/* Bottom Actions */}
                         <div className="mt-8 flex justify-between">
                             <div className="flex space-x-3">
                                 <button
                                     onClick={() => addQuestion('mcq')}
-                                    className="flex items-center space-x-2 bg-slate-700 hover:bg-slate-600 text-white px-5 py-3 rounded-xl font-semibold transition-colors"
+                                    className="flex items-center space-x-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-3 rounded-lg font-bold transition-colors text-sm"
                                 >
                                     <Plus size={18} />
                                     <span>Add MCQ</span>
                                 </button>
                                 <button
                                     onClick={() => addQuestion('subjective')}
-                                    className="flex items-center space-x-2 bg-purple-900/40 hover:bg-purple-900/60 text-purple-300 px-5 py-3 rounded-xl font-semibold transition-colors border border-purple-900/50"
+                                    className="flex items-center space-x-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-5 py-3 rounded-lg font-bold transition-colors border border-indigo-200 text-sm"
                                 >
                                     <Plus size={18} />
                                     <span>Add Subjective</span>
@@ -285,11 +309,12 @@ const CreateExam = () => {
 
                             <button
                                 onClick={handleSave}
-                                disabled={!isFormValid()}
-                                className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600 disabled:cursor-not-allowed text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-blue-600/20 transition-all"
+                                disabled={!isFormValid() || isSaving}
+                                aria-busy={isSaving}
+                                className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white px-8 py-3 rounded-full font-black shadow-xl shadow-blue-200 transition-all active:scale-[0.98]"
                             >
-                                <Save size={18} />
-                                <span>Save & Generate Code</span>
+                                {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                                <span>{isSaving ? 'Saving...' : 'Save & Generate Code'}</span>
                             </button>
                         </div>
                     </>

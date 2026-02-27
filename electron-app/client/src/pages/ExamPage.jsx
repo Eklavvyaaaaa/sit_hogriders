@@ -8,6 +8,7 @@ import { AuthContext } from '../context/AuthContext';
 import { CheckCircle2, ShieldCheck, PlayCircle, LogIn, ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import ChatBox from '../components/ChatBox';
 
+
 const ExamPage = () => {
     const location = useLocation();
     const navigate = useNavigate();
@@ -321,6 +322,7 @@ const ExamPage = () => {
                     </div>
                 </div>
             </div>
+
 
             <ChatBox examId={examData.examId} />
 

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import api from '../services/api';
-import { PlusCircle, Eye, Activity, BarChart3, Users, AlertTriangle, Flag, Download, Trophy, CheckCircle2, Loader2, Clock, XCircle, CalendarClock, Copy, MessageSquare } from 'lucide-react';
+import { PlusCircle, Eye, Activity, BarChart3, Users, AlertTriangle, Flag, Download, Trophy, CheckCircle2, Loader2, Clock, XCircle, CalendarClock, Copy, MessageSquare, Trash2, MoreVertical } from 'lucide-react';
 import ChatBox from '../components/ChatBox';
 
 const TeacherDashboard = () => {
@@ -11,6 +11,8 @@ const TeacherDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [chatExamId, setChatExamId] = useState(null);
+    const [menuOpenId, setMenuOpenId] = useState(null);
+    const [filter, setFilter] = useState('all');
     const navigate = useNavigate();
 
     const fetchDashboardData = async () => {
@@ -25,19 +27,19 @@ const TeacherDashboard = () => {
                 setExams(examsResult.value.data);
             } else {
                 console.error('Failed to fetch exams', examsResult.reason);
-                // Preserve existing exams state; show error instead of empty list
-                setError('Failed to load exams. Please try again.');
             }
+
             if (overviewResult.status === 'fulfilled') {
                 setOverview(overviewResult.value.data);
             } else {
                 console.error('Failed to fetch overview', overviewResult.reason);
-                // Preserve existing overview state; don't overwrite with null
-                if (!error) setError('Failed to load overview data. Please try again.');
             }
-            // Show combined error if both failed
+
+            // Only block dashboard if both requests failed
             if (examsResult.status === 'rejected' && overviewResult.status === 'rejected') {
                 setError('Failed to load dashboard data. Please try again.');
+            } else {
+                setError(null);
             }
         } catch (err) {
             console.error('Failed to fetch dashboard data', err);
@@ -50,6 +52,14 @@ const TeacherDashboard = () => {
     useEffect(() => {
         fetchDashboardData();
     }, []);
+
+    useEffect(() => {
+        const handleClickOutside = () => setMenuOpenId(null);
+        if (menuOpenId !== null) {
+            document.addEventListener('click', handleClickOutside);
+            return () => document.removeEventListener('click', handleClickOutside);
+        }
+    }, [menuOpenId]);
 
     const handleExportCSV = async (examId) => {
         let url;
@@ -64,6 +74,7 @@ const TeacherDashboard = () => {
             link.remove();
         } catch (err) {
             console.error('Export failed', err);
+            alert('Export failed: ' + (err.message || 'Unknown error'));
         } finally {
             if (url) window.URL.revokeObjectURL(url);
         }
@@ -81,16 +92,6 @@ const TeacherDashboard = () => {
             }
         } catch (err) {
             console.error('Failed to fetch flagged', err);
-        }
-    };
-
-    const handleViewStats = async (examId) => {
-        try {
-            const res = await api.get(`/exam/${examId}/stats`);
-            const s = res.data;
-            alert(`Exam Stats:\n\n• Students Joined: ${s.studentsJoined}\n• Submissions: ${s.submissions}\n• Violations: ${s.violations}\n• Flagged: ${s.flaggedStudents}\n• Status: ${s.exam.status}`);
-        } catch (err) {
-            console.error('Failed to fetch stats', err);
         }
     };
 
@@ -124,15 +125,21 @@ const TeacherDashboard = () => {
         }
     };
 
-    const handleReschedule = async (examId) => {
-        const input = prompt('Enter new scheduled time with timezone (e.g. 2026-03-01T10:00-08:00 or 2026-03-01T18:00Z):');
-        if (!input) return;
-
-        const iso8601Regex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/;
-        if (!iso8601Regex.test(input)) {
-            alert('Please enter a valid ISO-8601 date/time with an explicit timezone (e.g., 2026-03-01T10:00-08:00 or 2026-03-01T18:00Z).');
-            return;
+    const handleDelete = async (examId) => {
+        if (!window.confirm('Are you sure you want to DELETE this exam? This will permanently remove all submissions, scores, and monitoring data. This action CANNOT be undone.')) return;
+        try {
+            await api.delete(`/exam/${examId}`);
+            alert('Exam deleted successfully.');
+            fetchDashboardData();
+        } catch (err) {
+            console.error('Failed to delete exam', err);
+            alert('Failed to delete exam.');
         }
+    };
+
+    const handleReschedule = async (examId) => {
+        const input = prompt('Enter new scheduled time (e.g. 2026-03-01T10:00+05:30):');
+        if (!input) return;
 
         const parsedDate = new Date(input);
         if (isNaN(parsedDate.getTime())) {
@@ -151,239 +158,242 @@ const TeacherDashboard = () => {
     };
 
     const getStatusBadge = (status) => {
-        const colors = {
-            scheduled: 'bg-yellow-900/30 text-yellow-400 border-yellow-900/50',
-            active: 'bg-green-900/30 text-green-400 border-green-900/50',
-            completed: 'bg-slate-700/50 text-slate-400 border-slate-600',
-            terminated: 'bg-red-900/30 text-red-400 border-red-900/50'
+        const config = {
+            scheduled: { bg: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' },
+            active: { bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500 animate-pulse' },
+            completed: { bg: 'bg-slate-100 text-slate-600 border-slate-200', dot: 'bg-slate-400' },
+            terminated: { bg: 'bg-red-50 text-red-600 border-red-200', dot: 'bg-red-500' }
         };
-        return colors[status] || colors.scheduled;
+        return config[status] || config.scheduled;
     };
 
+    const filteredExams = filter === 'all' ? exams : exams.filter(e => e.status === filter);
+
     return (
-        <div className="min-h-screen bg-slate-900 flex flex-col">
+        <div className="min-h-screen flex flex-col font-inter bg-white">
             <Navbar />
             <div className="flex-1 max-w-7xl w-full mx-auto p-8">
+                {/* Header */}
                 <div className="flex justify-between items-center mb-8">
-                    <div>
-                        <h1 className="text-3xl font-bold text-white mb-2">Teacher Dashboard</h1>
-                        <p className="text-slate-400">Manage your exams and monitor live sessions.</p>
+                    <div className="space-y-1">
+                        <p className="text-[11px] font-black text-blue-600 uppercase tracking-widest">Teacher Portal</p>
+                        <h1 className="text-4xl font-black text-slate-900 tracking-tighter">Dashboard</h1>
+                        <p className="text-slate-500 text-sm font-medium">Manage your exams and monitor live sessions.</p>
                     </div>
-                    <div className="flex space-x-4">
-                        <button
-                            onClick={() => navigate('/create-exam')}
-                            className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-semibold shadow-lg shadow-blue-600/20 transition-all active:scale-[0.98]"
-                        >
-                            <PlusCircle size={20} />
-                            <span>Create Exam</span>
-                        </button>
-                    </div>
+                    <button
+                        onClick={() => navigate('/create-exam')}
+                        className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-full font-black shadow-xl shadow-blue-200 transition-all active:scale-[0.98]"
+                    >
+                        <PlusCircle size={20} />
+                        <span>Create Exam</span>
+                    </button>
                 </div>
 
-                {/* Error State */}
+                {/* Error */}
                 {error && (
-                    <div className="bg-red-900/30 border border-red-900/50 rounded-xl p-4 mb-8 flex items-center space-x-3">
-                        <AlertTriangle size={20} className="text-red-400 shrink-0" />
-                        <p className="text-red-300">{error}</p>
-                        <button
-                            onClick={() => fetchDashboardData()}
-                            className="ml-auto text-red-400 hover:text-red-300 text-sm font-medium underline"
-                        >
-                            Retry
-                        </button>
+                    <div className="bg-red-50 border border-red-100 rounded-xl p-4 mb-8 flex items-center space-x-3">
+                        <AlertTriangle size={20} className="text-red-500 shrink-0" />
+                        <p className="text-red-600 text-sm font-bold flex-1">{error}</p>
+                        <button onClick={fetchDashboardData} className="text-[10px] bg-red-100 hover:bg-red-200 text-red-700 font-bold px-2 py-1 rounded uppercase tracking-wider transition-colors">Retry</button>
                     </div>
                 )}
 
-                {/* Loading State */}
+                {/* Loading */}
                 {loading && (
                     <div className="flex flex-col items-center justify-center py-20">
                         <Loader2 size={40} className="text-blue-400 animate-spin mb-4" />
-                        <p className="text-slate-400 text-lg">Loading dashboard data...</p>
+                        <p className="text-slate-400 text-lg font-medium">Loading dashboard data...</p>
                     </div>
                 )}
 
                 {!loading && !error && (
                     <>
-                        {/* Performance Overview Section */}
+                        {/* Overview Stats */}
                         {overview && (
-                            <div className="mb-8">
-                                <h2 className="text-lg font-semibold text-slate-300 mb-4 uppercase tracking-wider">Performance Overview</h2>
-                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                                    <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-                                        <div className="flex items-center space-x-2 mb-2">
-                                            <BarChart3 size={16} className="text-blue-400" />
-                                            <span className="text-slate-400 text-xs uppercase tracking-wider">Total Exams</span>
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+                                {[
+                                    { label: 'Total Exams', value: overview.totalExams, icon: BarChart3, color: 'text-blue-600', bg: 'bg-blue-50' },
+                                    { label: 'Active', value: overview.activeExams, icon: Activity, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                                    { label: 'Completed', value: overview.completedExams, icon: CheckCircle2, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                                    { label: 'Violations', value: overview.totalViolations, icon: AlertTriangle, color: 'text-orange-600', bg: 'bg-orange-50' },
+                                    { label: 'Students', value: overview.totalStudents, icon: Users, color: 'text-cyan-600', bg: 'bg-cyan-50' },
+                                ].map((stat, i) => (
+                                    <div key={i} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]">
+                                        <div className="flex items-center space-x-2 mb-3">
+                                            <div className={`w-8 h-8 ${stat.bg} rounded-xl flex items-center justify-center`}>
+                                                <stat.icon size={16} className={stat.color} />
+                                            </div>
+                                            <span className="text-slate-400 text-[10px] uppercase tracking-widest font-black">{stat.label}</span>
                                         </div>
-                                        <p className="text-2xl font-bold text-white">{overview.totalExams}</p>
+                                        <p className="text-3xl font-black text-slate-900 tracking-tighter">{stat.value}</p>
                                     </div>
-                                    <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-                                        <div className="flex items-center space-x-2 mb-2">
-                                            <Activity size={16} className="text-green-400" />
-                                            <span className="text-slate-400 text-xs uppercase tracking-wider">Active Exams</span>
-                                        </div>
-                                        <p className="text-2xl font-bold text-white">{overview.activeExams}</p>
-                                    </div>
-                                    <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-                                        <div className="flex items-center space-x-2 mb-2">
-                                            <CheckCircle2 size={16} className="text-emerald-400" />
-                                            <span className="text-slate-400 text-xs uppercase tracking-wider">Completed Exams</span>
-                                        </div>
-                                        <p className="text-2xl font-bold text-white">{overview.completedExams}</p>
-                                    </div>
-                                    <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-                                        <div className="flex items-center space-x-2 mb-2">
-                                            <AlertTriangle size={16} className="text-orange-400" />
-                                            <span className="text-slate-400 text-xs uppercase tracking-wider">Total Violations</span>
-                                        </div>
-                                        <p className="text-2xl font-bold text-white">{overview.totalViolations}</p>
-                                    </div>
-                                    <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-                                        <div className="flex items-center space-x-2 mb-2">
-                                            <Users size={16} className="text-cyan-400" />
-                                            <span className="text-slate-400 text-xs uppercase tracking-wider">Total Students Appeared</span>
-                                        </div>
-                                        <p className="text-2xl font-bold text-white">{overview.totalStudents}</p>
-                                    </div>
-                                </div>
+                                ))}
                             </div>
                         )}
 
-                        {/* Exam Cards */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {exams.length === 0 ? (
-                                <div className="col-span-full text-center py-20 bg-slate-800/50 rounded-2xl border border-slate-700/50 border-dashed">
-                                    <p className="text-slate-400 text-lg mb-4">No exams created yet.</p>
+                        {/* Filter Tabs */}
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex space-x-1 bg-slate-50 rounded-full p-1 border border-slate-100">
+                                {['all', 'active', 'scheduled', 'completed', 'terminated'].map(f => (
                                     <button
-                                        onClick={() => navigate('/create-exam')}
-                                        className="text-blue-400 hover:text-blue-300 font-semibold flex items-center justify-center w-full max-w-[200px] mx-auto"
+                                        key={f}
+                                        onClick={() => setFilter(f)}
+                                        className={`px-4 py-1.5 rounded-full text-xs font-bold capitalize transition-all ${filter === f
+                                            ? 'bg-blue-600 text-white shadow-sm'
+                                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
+                                            }`}
                                     >
-                                        <PlusCircle size={18} className="mr-2" /> Create your first exam
+                                        {f}
                                     </button>
+                                ))}
+                            </div>
+                            <span className="text-slate-400 text-sm font-medium">{filteredExams.length} exam{filteredExams.length !== 1 ? 's' : ''}</span>
+                        </div>
+
+                        {/* Exam Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                            {filteredExams.length === 0 ? (
+                                <div className="col-span-full text-center py-20 bg-slate-50 rounded-2xl border border-slate-100 border-dashed">
+                                    <p className="text-slate-400 text-lg font-medium mb-4">
+                                        {filter === 'all' ? 'No exams created yet.' : `No ${filter} exams.`}
+                                    </p>
+                                    {filter === 'all' && (
+                                        <button
+                                            onClick={() => navigate('/create-exam')}
+                                            className="text-blue-600 hover:text-blue-700 font-bold flex items-center justify-center mx-auto"
+                                        >
+                                            <PlusCircle size={18} className="mr-2" /> Create your first exam
+                                        </button>
+                                    )}
                                 </div>
                             ) : (
-                                exams.map(exam => (
-                                    <div key={exam.id} className="bg-slate-800 rounded-2xl p-6 border border-slate-700 hover:border-slate-600 transition-colors shadow-lg shadow-slate-900/50 flex flex-col">
-                                        <div className="flex-1">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <h3 className="text-xl font-bold text-slate-100">{exam.title}</h3>
-                                                <span className={`text-xs px-2 py-1 rounded-lg border font-medium capitalize ${getStatusBadge(exam.status)}`}>
-                                                    {exam.status || 'scheduled'}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center flex-wrap gap-2 text-slate-400 text-sm mb-4">
-                                                <span className="bg-slate-900 px-2 py-1 rounded">Duration: {exam.duration} mins</span>
-                                                <span className="bg-slate-900 px-2 py-1 rounded">ID: {exam.id}</span>
-                                                {exam.exam_code && (
-                                                    <button
-                                                        type="button"
-                                                        aria-label="Copy exam code"
-                                                        className="bg-blue-900/30 text-blue-400 border border-blue-900/50 px-2 py-1 rounded font-mono cursor-pointer hover:bg-blue-900/50 transition-colors flex items-center space-x-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                        onClick={() => {
-                                                            navigator.clipboard.writeText(exam.exam_code)
-                                                                .then(() => alert('Exam code copied!'))
-                                                                .catch(err => console.error('Failed to copy text: ', err));
-                                                        }}
-                                                        title="Click to copy exam code"
-                                                    >
-                                                        <Copy size={12} />
-                                                        <span>Code: {exam.exam_code}</span>
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
+                                filteredExams.map(exam => {
+                                    const statusBadge = getStatusBadge(exam.status);
+                                    return (
+                                        <div key={exam.id} className="group bg-white rounded-2xl border border-slate-200 hover:border-blue-300 hover:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.1)] transition-all duration-300 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] flex flex-col overflow-hidden relative">
+                                            {/* Left accent bar on hover */}
+                                            <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-gradient-to-b from-blue-400 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
 
-                                        <div className="pt-4 border-t border-slate-700 space-y-3">
-                                            <div className="grid grid-cols-2 gap-3">
+                                            {/* Card Header */}
+                                            <div className="p-5 pb-3">
+                                                <div className="flex items-start justify-between mb-3">
+                                                    <div className="flex-1 min-w-0 mr-3">
+                                                        <h3 className="text-lg font-black text-slate-900 truncate tracking-tight group-hover:text-blue-700 transition-colors" title={exam.title}>{exam.title}</h3>
+                                                        <div className="flex items-center space-x-2 mt-1.5">
+                                                            <span className={`inline-flex items-center space-x-1.5 text-[9px] px-2 py-0.5 rounded-full border font-black uppercase tracking-widest ${statusBadge.bg}`}>
+                                                                <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dot}`}></span>
+                                                                <span>{exam.status || 'scheduled'}</span>
+                                                            </span>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* ⋯ Menu */}
+                                                    <div className="relative">
+                                                        <button
+                                                            onClick={e => { e.stopPropagation(); setMenuOpenId(menuOpenId === exam.id ? null : exam.id); }}
+                                                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                                                        >
+                                                            <MoreVertical size={16} />
+                                                        </button>
+                                                        {menuOpenId === exam.id && (
+                                                            <div className="absolute right-0 top-8 bg-white border border-slate-200 rounded-xl shadow-2xl py-1 z-50 min-w-[160px]">
+                                                                <button onClick={() => { setMenuOpenId(null); handleChangeTime(exam.id); }} className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                                                                    <Clock size={14} className="text-blue-500" />
+                                                                    <span>Change Duration</span>
+                                                                </button>
+                                                                <button onClick={() => { setMenuOpenId(null); handleReschedule(exam.id); }} className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                                                                    <CalendarClock size={14} className="text-violet-500" />
+                                                                    <span>Reschedule</span>
+                                                                </button>
+                                                                <button onClick={() => { setMenuOpenId(null); handleExportCSV(exam.id); }} className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                                                                    <Download size={14} className="text-emerald-500" />
+                                                                    <span>Export CSV</span>
+                                                                </button>
+                                                                <button onClick={() => { setMenuOpenId(null); handleViewFlagged(exam.id); }} className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                                                                    <Flag size={14} className="text-orange-500" />
+                                                                    <span>Flagged Students</span>
+                                                                </button>
+                                                                {exam.status === 'active' && (
+                                                                    <button onClick={() => { setMenuOpenId(null); handleTerminate(exam.id); }} className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                                                                        <XCircle size={14} />
+                                                                        <span>Terminate</span>
+                                                                    </button>
+                                                                )}
+                                                                <div className="border-t border-slate-100 my-1"></div>
+                                                                <button onClick={() => { setMenuOpenId(null); handleDelete(exam.id); }} className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                                                                    <Trash2 size={14} />
+                                                                    <span>Delete Exam</span>
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Meta Info */}
+                                                <div className="flex items-center flex-wrap gap-2 text-xs text-slate-500 font-medium">
+                                                    <span className="bg-slate-50 border border-slate-100 px-2 py-1 rounded-md text-[11px]"><Clock size={11} className="inline mr-1 -mt-px text-slate-400" />{exam.duration} min</span>
+                                                    <span className="bg-slate-50 border border-slate-100 px-2 py-1 rounded-md font-mono text-[11px]">ID: {exam.id}</span>
+                                                    {exam.exam_code && (
+                                                        <button
+                                                            type="button"
+                                                            className="bg-blue-50 text-blue-600 border border-blue-100 px-2 py-1 rounded-md font-mono text-[11px] cursor-pointer hover:bg-blue-100 transition-colors flex items-center space-x-1"
+                                                            onClick={() => navigator.clipboard.writeText(exam.exam_code).then(() => alert('Exam code copied!')).catch((err) => { console.error('Copy failed', err); alert('Failed to copy. Code: ' + exam.exam_code); })}
+                                                            title="Click to copy exam code"
+                                                        >
+                                                            <Copy size={11} />
+                                                            <span>{exam.exam_code}</span>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Action Buttons */}
+                                            <div className="mt-auto p-5 pt-3 border-t border-slate-100 flex flex-wrap gap-2">
                                                 <button
                                                     onClick={() => navigate(`/monitor/${exam.id}`, { state: { tab: 'live' } })}
-                                                    className="flex items-center justify-center space-x-2 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-sm font-medium transition-colors"
+                                                    className="flex-1 min-w-[calc(50%-0.25rem)] flex items-center justify-center space-x-1.5 bg-slate-900 hover:bg-slate-800 text-white py-2.5 rounded-xl text-xs font-bold transition-colors shadow-sm"
                                                 >
-                                                    <Activity size={16} />
+                                                    <Activity size={14} />
                                                     <span>Live Monitor</span>
                                                 </button>
                                                 <button
                                                     onClick={() => navigate(`/monitor/${exam.id}`, { state: { tab: 'logs' } })}
-                                                    className="flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-indigo-600/20"
+                                                    className="flex-1 min-w-[calc(50%-0.25rem)] flex items-center justify-center space-x-1.5 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl text-xs font-bold transition-colors shadow-sm"
                                                 >
-                                                    <Eye size={16} />
+                                                    <Eye size={14} />
                                                     <span>View Logs</span>
-                                                </button>
-                                            </div>
-                                            <div className="grid grid-cols-3 gap-2">
-                                                <button
-                                                    onClick={() => handleChangeTime(exam.id)}
-                                                    className="flex items-center justify-center space-x-1 bg-blue-900/30 hover:bg-blue-900/50 text-blue-400 py-2 rounded-lg text-xs font-medium transition-colors border border-blue-900/50"
-                                                >
-                                                    <Clock size={14} />
-                                                    <span>Change Time</span>
-                                                </button>
-                                                <button
-                                                    onClick={() => handleTerminate(exam.id)}
-                                                    className="flex items-center justify-center space-x-1 bg-red-900/30 hover:bg-red-900/50 text-red-400 py-2 rounded-lg text-xs font-medium transition-colors border border-red-900/50"
-                                                >
-                                                    <XCircle size={14} />
-                                                    <span>Terminate</span>
-                                                </button>
-                                                <button
-                                                    onClick={() => handleReschedule(exam.id)}
-                                                    className="flex items-center justify-center space-x-1 bg-violet-900/30 hover:bg-violet-900/50 text-violet-400 py-2 rounded-lg text-xs font-medium transition-colors border border-violet-900/50"
-                                                >
-                                                    <CalendarClock size={14} />
-                                                    <span>Reschedule</span>
-                                                </button>
-                                            </div>
-                                            <div className="grid grid-cols-4 gap-2">
-                                                <button
-                                                    onClick={() => handleViewStats(exam.id)}
-                                                    className="flex items-center justify-center space-x-1 bg-cyan-900/30 hover:bg-cyan-900/50 text-cyan-400 py-2 rounded-lg text-xs font-medium transition-colors border border-cyan-900/50"
-                                                >
-                                                    <BarChart3 size={14} />
-                                                    <span>Stats</span>
                                                 </button>
                                                 <button
                                                     onClick={() => navigate(`/exam-results/${exam.id}`)}
-                                                    className="flex items-center justify-center space-x-1 bg-amber-900/30 hover:bg-amber-900/50 text-amber-400 py-2 rounded-lg text-xs font-medium transition-colors border border-amber-900/50"
+                                                    className="flex-1 min-w-[calc(50%-0.25rem)] flex items-center justify-center space-x-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 py-2.5 rounded-xl text-xs font-bold transition-colors border border-indigo-100"
                                                 >
                                                     <Trophy size={14} />
                                                     <span>Results</span>
                                                 </button>
-                                                <button
-                                                    onClick={() => handleViewFlagged(exam.id)}
-                                                    className="flex items-center justify-center space-x-1 bg-red-900/30 hover:bg-red-900/50 text-red-400 py-2 rounded-lg text-xs font-medium transition-colors border border-red-900/50"
-                                                >
-                                                    <Flag size={14} />
-                                                    <span>Flagged</span>
-                                                </button>
-                                                <button
-                                                    onClick={() => handleExportCSV(exam.id)}
-                                                    className="flex items-center justify-center space-x-1 bg-emerald-900/30 hover:bg-emerald-900/50 text-emerald-400 py-2 rounded-lg text-xs font-medium transition-colors border border-emerald-900/50"
-                                                >
-                                                    <Download size={14} />
-                                                    <span>Export</span>
-                                                </button>
+                                                {exam.status === 'active' && (
+                                                    <button
+                                                        onClick={() => setChatExamId(chatExamId === exam.id ? null : exam.id)}
+                                                        className={`flex-1 min-w-[calc(50%-0.25rem)] flex items-center justify-center space-x-1.5 py-2.5 rounded-xl text-xs font-bold transition-colors border ${chatExamId === exam.id
+                                                            ? 'bg-blue-600 text-white border-blue-600'
+                                                            : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-100'
+                                                            }`}
+                                                    >
+                                                        <MessageSquare size={14} />
+                                                        <span>{chatExamId === exam.id ? 'Close Chat' : 'Chat'}</span>
+                                                    </button>
+                                                )}
                                             </div>
-                                            {exam.status === 'active' && (
-                                                <button
-                                                    onClick={() => setChatExamId(chatExamId === exam.id ? null : exam.id)}
-                                                    className={`mt-2 w-full flex items-center justify-center space-x-2 py-2 rounded-lg text-sm font-medium transition-colors border ${chatExamId === exam.id
-                                                        ? 'bg-blue-600 text-white border-blue-500'
-                                                        : 'bg-blue-900/30 hover:bg-blue-900/50 text-blue-400 border-blue-900/50'
-                                                        }`}
-                                                >
-                                                    <MessageSquare size={14} />
-                                                    <span>{chatExamId === exam.id ? 'Close Chat' : 'Chat'}</span>
-                                                </button>
-                                            )}
                                         </div>
-                                    </div>
-                                ))
+                                    );
+                                })
                             )}
                         </div>
                     </>
                 )}
-            </div >
+            </div>
+
             {chatExamId && <ChatBox examId={chatExamId} />}
-        </div >
+        </div>
     );
 };
 

@@ -22,7 +22,7 @@ const ProtectedRoute = ({ children, roleRequired }) => {
     } catch { return null; }
   })();
 
-  if (loading) return <div className="h-screen bg-slate-900 flex items-center justify-center text-white">Loading...</div>;
+  if (loading) return <div className="h-screen bg-white flex items-center justify-center text-slate-500 font-medium">Loading...</div>;
   if (!effectiveUser) return <Navigate to="/login" replace />;
   if (roleRequired && effectiveUser.role !== roleRequired) {
     return <Navigate to={effectiveUser.role === 'teacher' ? '/teacher' : '/join'} replace />;
