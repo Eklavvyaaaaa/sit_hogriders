@@ -7,14 +7,25 @@ import CreateExam from './pages/CreateExam';
 import JoinClassroom from './pages/JoinClassroom';
 import ExamPage from './pages/ExamPage';
 import MonitorDashboard from './pages/MonitorDashboard';
+import StudentHistory from './pages/StudentHistory';
+import SubmissionResults from './pages/SubmissionResults';
+import ExamResults from './pages/ExamResults';
 
 const ProtectedRoute = ({ children, roleRequired }) => {
   const { user, loading } = useContext(AuthContext);
 
+  // Fallback: check localStorage if context hasn't updated yet (React 18 batching)
+  const effectiveUser = user || (() => {
+    try {
+      const stored = localStorage.getItem('user');
+      return stored ? JSON.parse(stored) : null;
+    } catch { return null; }
+  })();
+
   if (loading) return <div className="h-screen bg-slate-900 flex items-center justify-center text-white">Loading...</div>;
-  if (!user) return <Navigate to="/login" replace />;
-  if (roleRequired && user.role !== roleRequired) {
-    return <Navigate to={user.role === 'teacher' ? '/teacher' : '/join'} replace />;
+  if (!effectiveUser) return <Navigate to="/login" replace />;
+  if (roleRequired && effectiveUser.role !== roleRequired) {
+    return <Navigate to={effectiveUser.role === 'teacher' ? '/teacher' : '/join'} replace />;
   }
 
   return children;
@@ -56,6 +67,14 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/exam-results/:examId"
+        element={
+          <ProtectedRoute roleRequired="teacher">
+            <ExamResults />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Student Routes */}
       <Route
@@ -71,6 +90,24 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute roleRequired="student">
             <ExamPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/history"
+        element={
+          <ProtectedRoute roleRequired="student">
+            <StudentHistory />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Shared Routes */}
+      <Route
+        path="/results/:submissionId"
+        element={
+          <ProtectedRoute>
+            <SubmissionResults />
           </ProtectedRoute>
         }
       />

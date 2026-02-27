@@ -1,3 +1,4 @@
+require('dotenv').config();
 const { Pool } = require('pg');
 
 const pool = new Pool({
@@ -5,17 +6,15 @@ const pool = new Pool({
 });
 
 /**
- * Initialize the database by creating all required tables.
- * Uses PostgreSQL syntax (SERIAL instead of AUTOINCREMENT, TEXT instead of DATETIME).
+ * Initialize the database by creating all required tables and running migrations.
  */
 const initDB = async () => {
   try {
-    // Test the connection
     const client = await pool.connect();
     console.log('Connected to Neon PostgreSQL database.');
     client.release();
 
-    // Create Tables
+    // Create base tables
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -30,14 +29,18 @@ const initDB = async () => {
         title TEXT NOT NULL,
         duration INTEGER NOT NULL,
         questions_json TEXT NOT NULL,
-        teacher_id INTEGER REFERENCES users(id)
+        teacher_id INTEGER REFERENCES users(id),
+        status TEXT DEFAULT 'scheduled',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        end_time TIMESTAMP
       );
 
       CREATE TABLE IF NOT EXISTS classrooms (
         id SERIAL PRIMARY KEY,
         code TEXT UNIQUE NOT NULL,
         exam_id INTEGER REFERENCES exams(id),
-        teacher_id INTEGER REFERENCES users(id)
+        teacher_id INTEGER REFERENCES users(id),
+        expires_at TIMESTAMPTZ
       );
 
       CREATE TABLE IF NOT EXISTS submissions (
@@ -55,7 +58,16 @@ const initDB = async () => {
         user_id INTEGER REFERENCES users(id),
         exam_id INTEGER REFERENCES exams(id),
         event_type TEXT NOT NULL,
+        severity TEXT DEFAULT 'medium',
         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        id SERIAL PRIMARY KEY,
+        exam_id INTEGER REFERENCES exams(id),
+        sender_id INTEGER REFERENCES users(id),
+        message_text TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
       CREATE TABLE IF NOT EXISTS answers (
@@ -91,7 +103,38 @@ const initDB = async () => {
         trust_factor REAL,
         final_score REAL
       );
+
+      CREATE TABLE IF NOT EXISTS students_exam (
+        id SERIAL PRIMARY KEY,
+        student_id INTEGER REFERENCES users(id),
+        exam_id INTEGER REFERENCES exams(id),
+        violation_count INTEGER DEFAULT 0,
+        flagged BOOLEAN DEFAULT false,
+        submitted BOOLEAN DEFAULT false,
+        joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(student_id, exam_id)
+      );
     `);
+
+    // Run migrations for existing tables (safe to run multiple times)
+    const migrations = [
+      "ALTER TABLE exams ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'scheduled'",
+      "ALTER TABLE exams ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "ALTER TABLE exams ADD COLUMN IF NOT EXISTS end_time TIMESTAMP",
+      "ALTER TABLE monitoring_logs ADD COLUMN IF NOT EXISTS severity TEXT DEFAULT 'medium'",
+      "ALTER TABLE classrooms ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ",
+      "ALTER TABLE classrooms ALTER COLUMN expires_at TYPE TIMESTAMPTZ",
+      // Terminate and Last Chance Columns
+      "ALTER TABLE students_exam ADD COLUMN IF NOT EXISTS terminated BOOLEAN DEFAULT false",
+      "ALTER TABLE students_exam ADD COLUMN IF NOT EXISTS terminated_at TIMESTAMP",
+      "ALTER TABLE students_exam ADD COLUMN IF NOT EXISTS last_chance_used BOOLEAN DEFAULT false",
+      // Rename legacy 'message' column to 'message_text' if it exists
+      "DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chat_messages' AND column_name='message') THEN ALTER TABLE chat_messages RENAME COLUMN message TO message_text; END IF; END $$"
+    ];
+
+    for (const migration of migrations) {
+      await pool.query(migration);
+    }
 
     console.log('Database tables initialized.');
   } catch (error) {
@@ -100,12 +143,6 @@ const initDB = async () => {
   }
 };
 
-/**
- * Execute a query against the PostgreSQL pool.
- * @param {string} text - SQL query string with $1, $2... placeholders
- * @param {Array} params - Query parameters
- * @returns {Promise<import('pg').QueryResult>}
- */
 const query = (text, params) => pool.query(text, params);
 
 module.exports = { initDB, query, pool };

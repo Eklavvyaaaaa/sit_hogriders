@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Secure Exam Monitor wrapper",
   "main": "main.js",
+  "type": "commonjs",
   "scripts": {
     "start": "cross-env VITE_DEV_SERVER_URL=http://localhost:5173 concurrently \"cd client && npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "build:react": "cd client && npm run build",
@@ -17,7 +18,6 @@
   },
   "devDependencies": {
     "electron": "^34.2.0",
-    "electron-builder": "^25.1.8",
-    "electron-is-dev": "^3.0.1"
+    "electron-builder": "^25.1.8"
   }
 }
