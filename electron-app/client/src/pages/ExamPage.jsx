@@ -19,12 +19,23 @@ const ExamPage = () => {
     const [hasStarted, setHasStarted] = useState(false);
     const [violationCount, setViolationCount] = useState(0);
     const removeFocusListenerRef = useRef(null);
+    const streamRef = useRef(null);
+    const ignoreNextBlur = useRef(false);
 
     useEffect(() => {
         if (!examData) {
             navigate('/join');
             return;
         }
+
+        // Pre-fetch camera stream to prevent reset during lock
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                streamRef.current = stream;
+            })
+            .catch(err => {
+                console.error("Camera pre-fetch failed:", err);
+            });
 
         // Cleanup on unmount
         return () => {
@@ -34,18 +45,31 @@ const ExamPage = () => {
             if (window.electronAPI) {
                 window.electronAPI.deactivateLock();
             }
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach(t => t.stop());
+            }
         };
     }, [examData, navigate]);
 
     const handleStartExam = () => {
+        ignoreNextBlur.current = true;
         setHasStarted(true);
         if (window.electronAPI) {
             window.electronAPI.activateLock();
 
             // Start monitoring focus loss
             removeFocusListenerRef.current = window.electronAPI.onFocusLost(() => {
+                if (ignoreNextBlur.current) {
+                    ignoreNextBlur.current = false;
+                    return;
+                }
                 logViolation('Window Focus Lost');
             });
+
+            // Just in case blur doesn't fire immediately, reset ignore flag after a short delay
+            setTimeout(() => {
+                ignoreNextBlur.current = false;
+            }, 2000);
         }
     };
 
@@ -218,7 +242,7 @@ const ExamPage = () => {
                 </div>
 
                 <div className="p-4 flex-1 overflow-visible">
-                    <MonitoringCamera examId={examData.examId} />
+                    <MonitoringCamera examId={examData.examId} stream={streamRef.current} />
 
                     <div className="mt-6 p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
                         <h3 className="text-sm font-semibold text-slate-300 mb-2">Instructions</h3>
