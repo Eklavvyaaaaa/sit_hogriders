@@ -5,3 +5,4 @@ build/
 *.db
 .DS_Store
 electron-debug-log.txt
+server/token.txt

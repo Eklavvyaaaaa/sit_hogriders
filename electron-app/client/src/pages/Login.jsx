@@ -123,10 +123,10 @@ const Login = () => {
                         className="w-8 h-8 object-contain animate-antigravity"
                     />
                     <span className="text-xl font-bold text-slate-900 tracking-tight">ATI Secure</span>
-                </div>
+                </div >
 
                 {/* Main Card with Smooth Height Transition */}
-                <div
+                < div
                     className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-white/50 relative overflow-hidden transition-all duration-500 ease-in-out"
                     style={{ height: formHeight !== 'auto' ? `${formHeight + 80}px` : 'auto' }}
                 >
@@ -246,10 +246,11 @@ const Login = () => {
                         <div className="mt-12 text-slate-400 text-[11px] text-center leading-relaxed font-semibold">
                             By signing in, you agree to our <button className="text-slate-600 underline">Terms of use</button> and acknowledge our <button className="text-slate-600 underline">Privacy notice</button>.
                         </div>
+
                     </div>
-                </div>
-            </div>
-        </div>
+                </div >
+            </div >
+        </div >
     );
 };
 

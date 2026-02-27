@@ -8,6 +8,7 @@ const StudentHistory = () => {
     const [history, setHistory] = useState([]);
     const [filteredHistory, setFilteredHistory] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [filters, setFilters] = useState({
         subject: '',
         dateRange: '',
@@ -20,22 +21,31 @@ const StudentHistory = () => {
     useEffect(() => {
         const fetchHistory = async () => {
             try {
-                // Mock data for demo - in production this uses api.get('/history/student')
-                const mockHistory = [
-                    { id: 1, submission_id: 's1', exam_title: 'Algorithms Quiz', subject: 'Computer Science', date: '2026-02-10', score: 92, ati: 98, status: 'Completed' },
-                    { id: 2, submission_id: 's2', exam_title: 'Linear Algebra Test', subject: 'Mathematics', date: '2026-02-03', score: 78, ati: 85, status: 'Completed' },
-                    { id: 3, submission_id: 's3', exam_title: 'Optics Midterm', subject: 'Physics', date: '2026-01-22', score: 85, ati: 92, status: 'Completed' },
-                ];
-                setHistory(mockHistory);
-                setFilteredHistory(mockHistory);
+                const res = await api.get('/history/student');
+                // map backend data to frontend model
+                const mappedHistory = res.data.map(item => ({
+                    id: item.submission_id,
+                    submission_id: item.submission_id,
+                    exam_title: item.exam_title || 'Untitled Exam',
+                    subject: 'Computer Science', // Mock subject
+                    date: item.submitted_at ? new Date(item.submitted_at).toLocaleDateString() : 'N/A',
+                    score: item.final_score ? Math.round(item.final_score) : 0,
+                    ati: 100 - (item.violation_count || 0) * 5, // Mock ATI formulation
+                    status: item.status
+                }));
+                setHistory(mappedHistory);
+                setFilteredHistory(mappedHistory);
+                setError(null);
             } catch (err) {
                 console.error('Failed to fetch history', err);
+                setError(err);
             } finally {
                 setLoading(false);
             }
         };
         fetchHistory();
     }, []);
+
 
     // Handle filtering and sorting
     useEffect(() => {
@@ -174,6 +184,7 @@ const StudentHistory = () => {
                     ATI Secure Smart Assessment Technology
                 </p>
             </main>
+
         </div>
     );
 };

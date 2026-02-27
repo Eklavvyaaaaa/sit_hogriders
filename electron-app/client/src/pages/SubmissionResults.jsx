@@ -1,28 +1,47 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import { ArrowLeft, Shield, AlertTriangle, ChevronRight } from 'lucide-react';
+import api from '../services/api';
+import { AuthContext } from '../context/AuthContext';
+import { ArrowLeft, Award, Brain, Shield, AlertTriangle, CheckCircle2, XCircle, ChevronRight } from 'lucide-react';
 
 const SubmissionResults = () => {
     const { submissionId } = useParams();
     const navigate = useNavigate();
+    const { user } = useContext(AuthContext);
     const [detail, setDetail] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchDetail = async () => {
             try {
-                // Mock data for demo
-                const mockDetail = {
-                    exam_title: 'Algorithms Quiz',
-                    subject: 'Computer Science',
-                    date: 'Feb 10, 2026',
-                    score: 92,
-                    ati: 98,
-                    correct: 18,
-                    incorrect: 2,
-                    timeTaken: '45 mins',
-                    percentile: 95,
+                const res = await api.get(`/history/submission/${submissionId}`);
+                const data = res.data;
+                const { submission, student, exam, questions, answers, finalGrade } = data;
+
+                // Calculate correct/incorrect based on MCQ answers
+                let correct = 0;
+                let incorrect = 0;
+                if (questions) {
+                    questions.forEach((q, index) => {
+                        const answer = answers.find(a => a.question_id === (q.id || index));
+                        if (q.type !== 'subjective' && answer && q.options) {
+                            if (answer.answer_text === q.options[q.correctOption]) correct++;
+                            else if (answer.answer_text) incorrect++;
+                        }
+                    });
+                }
+
+                setDetail({
+                    exam_title: exam?.title || 'Untitled Exam',
+                    subject: 'Subject', // Static fallback since missing from API
+                    date: submission?.submitted_at ? new Date(submission.submitted_at).toLocaleDateString() : 'N/A',
+                    score: finalGrade ? Math.round(finalGrade.final_score) : 0,
+                    ati: submission?.violation_count !== null ? Math.max(0, 100 - submission.violation_count * 5) : 100,
+                    correct,
+                    incorrect,
+                    timeTaken: `${submission?.duration || 0} mins`,
+                    percentile: 95, // Mock
                     behavioralMetrics: [
                         { label: 'Typing Consistency', score: 96 },
                         { label: 'Response Latency', score: 94 },
@@ -30,16 +49,16 @@ const SubmissionResults = () => {
                         { label: 'Language Consistency', score: 98 },
                         { label: 'Focus Stability', score: 89 }
                     ]
-                };
-                setDetail(mockDetail);
+                });
             } catch (err) {
-                console.error('Failed to fetch detail', err);
+                console.error('Failed to fetch submission', err);
             } finally {
                 setLoading(false);
             }
         };
         fetchDetail();
     }, [submissionId]);
+
 
     const getScoreColor = (score) => {
         if (score >= 85) return 'text-emerald-600 bg-emerald-50 border-emerald-100';
@@ -56,7 +75,7 @@ const SubmissionResults = () => {
 
             <main className="max-w-5xl mx-auto px-8 py-12">
                 <button
-                    onClick={() => navigate('/history')}
+                    onClick={() => navigate(user?.role === 'teacher' ? '/teacher' : '/history')}
                     className="flex items-center gap-2 text-slate-400 font-bold text-sm hover:text-slate-600 mb-10 transition-colors"
                 >
                     <ArrowLeft size={16} /> Back to History
@@ -159,6 +178,7 @@ const SubmissionResults = () => {
                     ATI Secure Smart Assessment Technology
                 </p>
             </main>
+
         </div>
     );
 };

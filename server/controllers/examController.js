@@ -32,28 +32,33 @@ exports.getTeacherExams = async (req, res) => {
         const teacherId = req.user.id;
         const { status, highViolations } = req.query;
 
-        let sql = 'SELECT * FROM exams WHERE teacher_id = $1';
+        let sql = 'SELECT e.*, (SELECT c.code FROM classrooms c WHERE c.exam_id = e.id LIMIT 1) as exam_code FROM exams e WHERE e.teacher_id = $1';
         const params = [teacherId];
 
         if (status) {
             params.push(status);
-            sql += ` AND status = $${params.length}`;
+            sql += ` AND e.status = $${params.length}`;
         }
 
-        sql += ' ORDER BY created_at DESC NULLS LAST';
+        sql += ' ORDER BY e.created_at DESC NULLS LAST';
 
         const result = await query(sql, params);
         let exams = result.rows;
 
         if (highViolations === 'true') {
             const enrichedResult = await query(`
-                SELECT e.*, COUNT(m.id) as "violationCount"
+                SELECT e.*, 
+                       (SELECT c.code FROM classrooms c WHERE c.exam_id = e.id LIMIT 1) as exam_code, 
+                       COALESCE(m.violationCount, 0) as "violationCount"
                 FROM exams e
-                LEFT JOIN monitoring_logs m ON e.id = m.exam_id
+                LEFT JOIN (
+                    SELECT exam_id, COUNT(*) as violationCount
+                    FROM monitoring_logs
+                    GROUP BY exam_id
+                ) m ON e.id = m.exam_id
                 WHERE e.teacher_id = $1
                 ${status ? `AND e.status = $2` : ''}
-                GROUP BY e.id
-                HAVING COUNT(m.id) > 5
+                AND COALESCE(m.violationCount, 0) > 5
                 ORDER BY e.created_at DESC NULLS LAST
             `, status ? [teacherId, status] : [teacherId]);
             exams = enrichedResult.rows.map(row => ({ ...row, violationCount: parseInt(row.violationCount) }));
@@ -62,6 +67,21 @@ exports.getTeacherExams = async (req, res) => {
         res.json(exams);
     } catch (error) {
         console.error('Get exams error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// Get teacher's exams — lightweight version for dashboard
+exports.getMyExams = async (req, res) => {
+    try {
+        const teacherId = req.user.id;
+        const result = await query(
+            'SELECT id, title, duration, status, created_at FROM exams WHERE teacher_id = $1 ORDER BY created_at DESC',
+            [teacherId]
+        );
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Get my exams error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 };
@@ -96,11 +116,7 @@ exports.submitExam = async (req, res) => {
             return res.status(403).json({ message: 'Not enrolled in this exam' });
         }
 
-        // Avoid double submission
-        const subCheck = await query('SELECT id FROM submissions WHERE exam_id = $1 AND student_id = $2 AND status = $3', [examId, studentId, 'submitted']);
-        if (subCheck.rows.length > 0) {
-            return res.status(400).json({ message: 'Exam has already been submitted' });
-        }
+
 
         // Parse exam questions
         let questions;
@@ -194,11 +210,21 @@ exports.submitExam = async (req, res) => {
         try {
             await client.query('BEGIN');
 
-            const subResult = await client.query(
-                `INSERT INTO submissions (student_id, exam_id, answers_json, score, status, submitted_at)
-                     VALUES ($1, $2, $3, $4, 'submitted', CURRENT_TIMESTAMP) RETURNING id`,
-                [studentId, examId, JSON.stringify(answers), mcqScore]
-            );
+            let subResult;
+            try {
+                // We rely on the unique constraint (exam_id, student_id) in the DB to prevent double submissions.
+                subResult = await client.query(
+                    `INSERT INTO submissions (student_id, exam_id, answers_json, score, status, submitted_at)
+                         VALUES ($1, $2, $3, $4, 'submitted', CURRENT_TIMESTAMP) RETURNING id`,
+                    [studentId, examId, JSON.stringify(answers), mcqScore]
+                );
+            } catch (insertErr) {
+                if (insertErr.code === '23505') { // Postgres unique_violation error code
+                    await client.query('ROLLBACK');
+                    return res.status(400).json({ message: 'Exam has already been submitted' });
+                }
+                throw insertErr;
+            }
             const submissionId = subResult.rows[0].id;
 
             for (const evalData of atiEvaluations) {
@@ -272,17 +298,33 @@ exports.getExamStats = async (req, res) => {
             return res.status(403).json({ message: 'Unauthorized' });
         }
 
-        const studentsJoined = await query('SELECT COUNT(*) as count FROM students_exam WHERE exam_id = $1', [id]);
-        const submissionsCount = await query('SELECT COUNT(*) as count FROM submissions WHERE exam_id = $1', [id]);
+        const studentsJoined = await query('SELECT COUNT(DISTINCT student_id) as count FROM submissions WHERE exam_id = $1', [id]);
+        const submissionsCount = await query('SELECT COUNT(*) as count FROM submissions WHERE exam_id = $1 AND status = $2', [id, 'submitted']);
         const violationCount = await query('SELECT COUNT(*) as count FROM monitoring_logs WHERE exam_id = $1', [id]);
         const flaggedCount = await query('SELECT COUNT(*) as count FROM students_exam WHERE exam_id = $1 AND flagged = true', [id]);
+
+        const studentsList = await query(`
+            SELECT 
+                s.student_id, 
+                (SELECT COUNT(*) FROM monitoring_logs m WHERE m.exam_id = $1 AND m.user_id = s.student_id) as violation_count, 
+                MAX(COALESCE(se.flagged, false)::int) > 0 as flagged, 
+                u.name, 
+                u.email
+            FROM submissions s
+            JOIN users u ON s.student_id = u.id
+            LEFT JOIN students_exam se ON s.student_id = se.student_id AND s.exam_id = se.exam_id
+            WHERE s.exam_id = $1 AND s.status = 'in_progress'
+            GROUP BY s.student_id, u.name, u.email
+            ORDER BY u.name ASC
+        `, [id]);
 
         res.json({
             studentsJoined: parseInt(studentsJoined.rows[0].count),
             submissions: parseInt(submissionsCount.rows[0].count),
             violations: parseInt(violationCount.rows[0].count),
             flaggedStudents: parseInt(flaggedCount.rows[0].count),
-            exam: examResult.rows[0]
+            exam: examResult.rows[0],
+            studentsList: studentsList.rows
         });
     } catch (error) {
         console.error('Exam stats error:', error);
@@ -355,6 +397,90 @@ exports.exportExamLogs = async (req, res) => {
         res.send(headers + rows);
     } catch (error) {
         console.error('Export logs error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+// Update exam duration (teacher only)
+exports.updateExamTime = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { duration } = req.body;
+        const teacherId = req.user.id;
+
+        if (!duration || typeof duration !== 'number' || duration <= 0) {
+            return res.status(400).json({ message: 'Valid duration (positive number) is required' });
+        }
+
+        const result = await query(
+            'UPDATE exams SET duration = $1 WHERE id = $2 AND teacher_id = $3 RETURNING *',
+            [duration, id, teacherId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Exam not found or unauthorized' });
+        }
+
+        res.json({ message: 'Exam duration updated', exam: result.rows[0] });
+    } catch (error) {
+        console.error('Update exam time error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// Terminate exam (teacher only)
+exports.terminateExam = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const teacherId = req.user.id;
+
+        const result = await query(
+            "UPDATE exams SET status = 'terminated' WHERE id = $1 AND teacher_id = $2 RETURNING *",
+            [id, teacherId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Exam not found or unauthorized' });
+        }
+
+        res.json({ message: 'Exam terminated', exam: result.rows[0] });
+    } catch (error) {
+        console.error('Terminate exam error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// Reschedule exam (teacher only)
+exports.rescheduleExam = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { new_time } = req.body;
+        const teacherId = req.user.id;
+
+        if (!new_time) {
+            return res.status(400).json({ message: 'new_time is required' });
+        }
+
+        const parsedTime = new Date(new_time);
+        if (isNaN(parsedTime.getTime())) {
+            return res.status(400).json({ message: 'Invalid date format for new_time' });
+        }
+
+        if (parsedTime <= new Date()) {
+            return res.status(400).json({ message: 'New schedule time must be in the future' });
+        }
+
+        const result = await query(
+            "UPDATE exams SET end_time = $1, status = 'scheduled' WHERE id = $2 AND teacher_id = $3 RETURNING *",
+            [parsedTime, id, teacherId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Exam not found or unauthorized' });
+        }
+
+        res.json({ message: 'Exam rescheduled', exam: result.rows[0] });
+    } catch (error) {
+        console.error('Reschedule exam error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 };

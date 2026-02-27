@@ -55,7 +55,7 @@ const Navbar = () => {
                     <Link
                         to="/history"
                         className={`flex items-center space-x-2 px-6 py-2 rounded-xl text-sm font-bold tracking-tight transition-all ${location.pathname.startsWith('/history') || location.pathname.startsWith('/results') || location.pathname.startsWith('/review')
-                                ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                            ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
                             }`}
                     >
                         <History size={16} />
@@ -63,6 +63,7 @@ const Navbar = () => {
                     </Link>
                 </div>
             )}
+
 
             {/* Right: Actions */}
             <div className="flex items-center space-x-6">
@@ -96,7 +97,7 @@ const Navbar = () => {
                     </>
                 )}
             </div>
-        </nav>
+        </nav >
     );
 };
 
