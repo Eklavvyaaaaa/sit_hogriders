@@ -333,9 +333,10 @@ export const useMonitoring = (examId, onFrameUpdate) => {
             sendLog('Window blur / loss of focus detected');
         };
 
+        let dispose = null;
         try {
             if (window.electronAPI && typeof window.electronAPI.onWindowBlur === 'function') {
-                window.electronAPI.onWindowBlur(handleBlur);
+                dispose = window.electronAPI.onWindowBlur(handleBlur);
             } else {
                 window.addEventListener('blur', handleBlur);
             }
@@ -345,13 +346,9 @@ export const useMonitoring = (examId, onFrameUpdate) => {
         }
 
         return () => {
-            try {
-                if (window.electronAPI && typeof window.electronAPI.removeBlurListeners === 'function') {
-                    window.electronAPI.removeBlurListeners();
-                } else {
-                    window.removeEventListener('blur', handleBlur);
-                }
-            } catch (e) {
+            if (typeof dispose === 'function') {
+                dispose();
+            } else {
                 window.removeEventListener('blur', handleBlur);
             }
         };
@@ -373,13 +370,12 @@ export const useMonitoring = (examId, onFrameUpdate) => {
             try {
                 await videoElement.play();
                 log('Camera', 'Video element playing');
+                setIsMonitoring(true);
+                setMonitoringError(null);
             } catch (playErr) {
                 warn('Camera', 'video.play() failed:', playErr.message);
                 setMonitoringError('Failed to play camera feed.');
             }
-
-            setIsMonitoring(true);
-            setMonitoringError(null);
         } catch (camErr) {
             err('Camera', 'getUserMedia failed:', camErr.message);
             sendLog('Camera access denied');

@@ -35,10 +35,22 @@ function createWindow() {
     }
   });
 
-  // Handle Permissions for Camera/Microphone automatically
-  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-    const allowedPermissions = ['media', 'camera', 'microphone'];
-    if (allowedPermissions.includes(permission)) {
+  // Handle Permissions for Camera/Microphone — validate origin
+  const allowedPermissions = ['media', 'camera', 'microphone'];
+
+  const isTrustedOrigin = (url) => {
+    if (!url) return false;
+    try {
+      if (url.startsWith('file://')) return true;
+      const parsed = new URL(url);
+      return parsed.hostname === 'localhost' && parsed.port === '5173';
+    } catch {
+      return false;
+    }
+  };
+
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
+    if (allowedPermissions.includes(permission) && isTrustedOrigin(details.requestingUrl)) {
       callback(true);
     } else {
       callback(false);
@@ -46,8 +58,7 @@ function createWindow() {
   });
 
   session.defaultSession.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
-    const allowedPermissions = ['media', 'camera', 'microphone'];
-    if (allowedPermissions.includes(permission)) {
+    if (allowedPermissions.includes(permission) && isTrustedOrigin(requestingOrigin)) {
       return true;
     }
     return false;

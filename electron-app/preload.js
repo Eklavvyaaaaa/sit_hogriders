@@ -12,7 +12,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onWindowBlur: (callback) => {
         const listener = () => callback();
         ipcRenderer.on('focus-lost', listener);
+        return () => ipcRenderer.removeListener('focus-lost', listener);
     },
+    // Global teardown — only use on full app shutdown, not per-subscription
     removeBlurListeners: () => {
         ipcRenderer.removeAllListeners('focus-lost');
     }
