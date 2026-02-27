@@ -1,10 +1,29 @@
+import logging
+import sys
+import re
+import numpy as np
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
-import numpy as np
-import re
 
-# Load model from local cache only (important for your setup)
-model = SentenceTransformer("all-MiniLM-L6-v2", local_files_only=True)
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+model = None
+
+def get_model():
+    """
+    Lazily loads the SentenceTransformer model.
+    """
+    global model
+    if model is None:
+        try:
+            logger.info("Loading SentenceTransformer model...")
+            model = SentenceTransformer("all-MiniLM-L6-v2", local_files_only=True)
+        except Exception as e:
+            logger.error(f"Failed to load model: {e}", exc_info=True)
+            # Optional: Fallback or retry logic could go here
+    return model
 
 
 def preprocess_text(text):
@@ -20,7 +39,11 @@ def compute_semantic_similarity(student_answer, model_answer):
     """
     Computes overall semantic similarity between student answer and model answer.
     """
-    embeddings = model.encode([student_answer, model_answer])
+    model_instance = get_model()
+    if model_instance is None:
+        raise RuntimeError("Model not loaded")
+
+    embeddings = model_instance.encode([student_answer, model_answer])
     similarity = cosine_similarity(
         [embeddings[0]],
         [embeddings[1]]
@@ -36,11 +59,15 @@ def compute_concept_coverage(student_answer, key_points):
     if not key_points:
         return 0.0
 
-    student_embedding = model.encode(student_answer)
+    model_instance = get_model()
+    if model_instance is None:
+        raise RuntimeError("Model not loaded")
+
+    student_embedding = model_instance.encode(student_answer)
     coverage_scores = []
 
     for concept in key_points:
-        concept_embedding = model.encode(concept)
+        concept_embedding = model_instance.encode(concept)
         similarity = cosine_similarity(
             [student_embedding],
             [concept_embedding]
@@ -55,10 +82,27 @@ def calculate_cis(student_answer, model_answer, key_points):
     Content Integrity Score (CIS v3)
     """
 
+    # Normalize and validate key_points
+    if key_points is None:
+        key_points = []
+    elif isinstance(key_points, (str, bytes, int, float)):
+        key_points = [key_points]
+
+    normalized_key_points = []
+    try:
+        for kp in key_points:
+            if kp is not None:
+                kp_str = str(kp).strip()
+                if kp_str:
+                    normalized_key_points.append(kp_str)
+    except TypeError:
+        # If it wasn't iterable at all (e.g. an object that's not a scalar)
+        key_points = []
+
     # Preprocess
     student_answer = preprocess_text(student_answer)
     model_answer = preprocess_text(model_answer)
-    key_points = [preprocess_text(k) for k in key_points]
+    key_points = [preprocess_text(k) for k in normalized_key_points]
 
     # Word counts
     student_word_count = len(student_answer.split())
@@ -98,7 +142,7 @@ def calculate_cis(student_answer, model_answer, key_points):
     # Clamp score between 0 and 1
     base_score = max(0.0, min(base_score, 1.0))
 
-    # Scale to 0–100
+    # Scale to 0-100
     cis_score = base_score * 100
 
     return {
