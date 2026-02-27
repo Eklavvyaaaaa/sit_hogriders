@@ -15,10 +15,12 @@ function sanitizeQuestions(questionsJson) {
     let questions;
     try {
         questions = JSON.parse(questionsJson);
-    } catch {
-        return [];
+    } catch (err) {
+        throw new Error(`sanitizeQuestions: Malformed questions payload — ${err.message}`);
     }
-    if (!Array.isArray(questions)) return [];
+    if (!Array.isArray(questions)) {
+        throw new Error('sanitizeQuestions: Expected questions to be an array, got ' + typeof questions);
+    }
 
     return questions.map(q => {
         const sanitized = { ...q };
@@ -197,15 +199,42 @@ exports.joinClassroom = async (req, res) => {
             actualEndTime = updateResult.rows[0].end_time;
         } else {
             // Another request may have activated it — re-query for the latest end_time
-            const freshExam = await query('SELECT end_time FROM exams WHERE id = $1', [exam.id]);
-            actualEndTime = freshExam.rows.length > 0 ? freshExam.rows[0].end_time : null;
+            const freshExam = await query('SELECT end_time, status FROM exams WHERE id = $1', [exam.id]);
+            if (freshExam.rows.length > 0) {
+                actualEndTime = freshExam.rows[0].end_time;
+                // ── Re-validate against authoritative state (guards stale-object race) ──
+                if (freshExam.rows[0].status === 'completed') {
+                    return res.status(403).json({ message: 'Exam has already ended' });
+                }
+            } else {
+                actualEndTime = null;
+            }
+        }
+
+        // ── 10. Re-run buffer/expiry checks against authoritative end_time ──
+        if (actualEndTime) {
+            const freshEndTime = new Date(actualEndTime);
+            const now = new Date();
+
+            // Reject if exam has already expired
+            if (now >= freshEndTime) {
+                return res.status(403).json({ message: 'Exam time has already expired.' });
+            }
+
+            // Reject if join buffer window has closed
+            const freshStartTime = new Date(freshEndTime.getTime() - exam.duration * 60 * 1000);
+            const freshBufferDeadline = new Date(freshStartTime.getTime() + JOIN_BUFFER_MINUTES * 60 * 1000);
+            if (now > freshBufferDeadline) {
+                return res.status(403).json({ message: 'Joining window has closed. You can only join within 5 minutes of exam start.' });
+            }
         }
 
         // Calculate remaining duration for late joiners
         let remainingDuration = exam.duration;
         if (actualEndTime) {
             const msRemaining = new Date(actualEndTime).getTime() - Date.now();
-            remainingDuration = Math.max(1, Math.ceil(msRemaining / 60000)); // At least 1 minute
+            // Only apply minimum-duration if exam hasn't expired (already guarded above)
+            remainingDuration = Math.max(1, Math.ceil(msRemaining / 60000));
         }
 
         // ── 10. Sanitize questions: strip grading fields before sending to student ──
