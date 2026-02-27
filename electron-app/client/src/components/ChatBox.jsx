@@ -3,6 +3,7 @@ import { AuthContext } from '../context/AuthContext';
 import api from '../services/api';
 import { MessageSquare, Send, X } from 'lucide-react';
 import { io } from 'socket.io-client';
+import Cookies from 'js-cookie';
 
 const ChatBox = ({ examId }) => {
     const { user } = useContext(AuthContext);
@@ -28,8 +29,11 @@ const ChatBox = ({ examId }) => {
         };
         fetchMessages();
 
-        // Connect to socket
-        const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5001');
+        // Connect to socket with JWT auth
+        const token = Cookies.get('token');
+        const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5001', {
+            auth: { token }
+        });
         socketRef.current = socket;
 
         socket.emit('join:chat', examId);
