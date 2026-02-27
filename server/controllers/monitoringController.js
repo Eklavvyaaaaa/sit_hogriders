@@ -125,3 +125,108 @@ exports.getLogs = async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 };
+
+exports.terminateSession = async (req, res) => {
+    try {
+        const { examId } = req.body;
+        const studentId = req.user.id;
+
+        if (!examId) {
+            return res.status(400).json({ message: 'Exam ID is required for termination.' });
+        }
+
+        // Add columns if they don't exist yet (safe migration)
+        try {
+            await query(`ALTER TABLE students_exam ADD COLUMN IF NOT EXISTS terminated BOOLEAN DEFAULT false;`);
+            await query(`ALTER TABLE students_exam ADD COLUMN IF NOT EXISTS terminated_at TIMESTAMP;`);
+        } catch (e) {
+            console.error('Migration notice:', e.message);
+        }
+
+        const result = await query(`
+            UPDATE students_exam 
+            SET terminated = true, terminated_at = CURRENT_TIMESTAMP
+            WHERE student_id = $1 AND exam_id = $2
+            RETURNING *
+        `, [studentId, examId]);
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ message: 'Student exam session not found.' });
+        }
+
+        const io = getIO();
+        if (io) {
+            io.to(`exam:${examId}`).emit('student:terminated', {
+                studentId,
+                examId,
+                timestamp: new Date().toISOString()
+            });
+        }
+
+        res.json({ message: 'Session terminated successfully due to excessive alerts.' });
+    } catch (error) {
+        console.error('Terminate session error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+exports.requestLastChance = async (req, res) => {
+    try {
+        const { examId } = req.body;
+        const studentId = req.user.id;
+
+        if (!examId) {
+            return res.status(400).json({ message: 'Exam ID is required.' });
+        }
+
+        // Add column safely if missing
+        try {
+            await query(`ALTER TABLE students_exam ADD COLUMN IF NOT EXISTS last_chance_used BOOLEAN DEFAULT false;`);
+        } catch (e) {
+            console.error('Migration notice:', e.message);
+        }
+
+        const checkResult = await query(`
+            SELECT last_chance_used FROM students_exam 
+            WHERE student_id = $1 AND exam_id = $2
+        `, [studentId, examId]);
+
+        if (checkResult.rowCount === 0) {
+            return res.status(404).json({ message: 'Session not found.' });
+        }
+
+        if (checkResult.rows[0].last_chance_used) {
+            return res.status(403).json({ message: 'Last chance attempt already used. Exam is permanently locked.' });
+        }
+
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            // Wipe logs so they start fresh
+            await client.query(`
+                DELETE FROM monitoring_logs 
+                WHERE user_id = $1 AND exam_id = $2
+            `, [studentId, examId]);
+
+            // Reset violations safely
+            await client.query(`
+                UPDATE students_exam 
+                SET terminated = false, violation_count = 0, last_chance_used = true
+                WHERE student_id = $1 AND exam_id = $2
+            `, [studentId, examId]);
+
+            await client.query('COMMIT');
+        } catch (err) {
+            await client.query('ROLLBACK');
+            throw err;
+        } finally {
+            client.release();
+        }
+
+        res.json({ message: 'Last chance granted. Warnings resetted to 0.' });
+    } catch (error) {
+        console.error('Last chance error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
