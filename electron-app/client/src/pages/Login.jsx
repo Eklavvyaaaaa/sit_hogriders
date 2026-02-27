@@ -19,22 +19,35 @@ const Login = () => {
             if (isRegister) {
                 await register(formData.name, formData.email, formData.password, formData.role);
                 setIsRegister(false); // Switch to login after successful register
-                alert('Registration successful! Please login.');
             } else {
                 const user = await login(formData.email, formData.password);
+                console.log("Login successful:", user);
+
+                // Also store token in localStorage for direct API calls
+                const token = document.cookie
+                    .split('; ')
+                    .find(row => row.startsWith('token='))
+                    ?.split('=')[1];
+                if (token) {
+                    localStorage.setItem("token", token);
+                }
+                if (user.role) {
+                    localStorage.setItem("role", user.role);
+                }
+
                 navigate(user.role === 'teacher' ? '/teacher' : '/join');
             }
         } catch (err) {
-            console.error('Authentication attempt failed:', err.message || err.response?.status);
-            setError(err.response?.data?.message || 'Authentication failed');
+            console.error('Authentication attempt failed:', err);
+            setError(err.response?.data?.message || err.message || 'Authentication failed');
         }
     };
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-slate-900 px-4 flex-col relative overflow-hidden">
             {/* Decals background */}
-            <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-blue-600/20 blur-[120px] rounded-full point-events-none"></div>
-            <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-indigo-600/20 blur-[120px] rounded-full point-events-none"></div>
+            <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-blue-600/20 blur-[120px] rounded-full pointer-events-none"></div>
+            <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-indigo-600/20 blur-[120px] rounded-full pointer-events-none"></div>
 
             <div className="mb-8 flex flex-col items-center">
                 <div className="p-4 bg-slate-800 rounded-2xl shadow-xl shadow-slate-900/50 mb-4 border border-slate-700/50 relative">
