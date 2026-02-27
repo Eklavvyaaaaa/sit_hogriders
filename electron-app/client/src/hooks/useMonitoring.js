@@ -337,6 +337,8 @@ export const useMonitoring = (examId, onFrameUpdate) => {
         try {
             if (window.electronAPI && typeof window.electronAPI.onWindowBlur === 'function') {
                 dispose = window.electronAPI.onWindowBlur(handleBlur);
+            } else if (window.electronAPI && typeof window.electronAPI.onFocusLost === 'function') {
+                dispose = window.electronAPI.onFocusLost(handleBlur);
             } else {
                 window.addEventListener('blur', handleBlur);
             }
@@ -357,12 +359,12 @@ export const useMonitoring = (examId, onFrameUpdate) => {
     // ══════════════════════════════════════════════════════
     // 5. PUBLIC API
     // ══════════════════════════════════════════════════════
-    const startMonitoring = async (videoElement) => {
+    const startMonitoring = async (videoElement, existingStream = null) => {
         videoRef.current = videoElement;
         log('Camera', 'Requesting camera access...');
 
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            const stream = existingStream || await navigator.mediaDevices.getUserMedia({ video: true });
             videoElement.srcObject = stream;
             streamRef.current = stream;
             log('Camera', 'Camera stream started ✓');

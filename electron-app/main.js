@@ -129,10 +129,8 @@ ipcMain.on('activate-lock', () => {
 
   isLocked = true;
 
-  // 1. Force Fullscreen and Kiosk mode
+  // 1. Force Fullscreen
   mainWindow.setFullScreen(true);
-  mainWindow.setKiosk(true);
-  mainWindow.setAlwaysOnTop(true, 'screen-saver');
   mainWindow.setResizable(false);
 
   // 2. Disable DevTools dynamically if open
@@ -149,10 +147,8 @@ ipcMain.on('deactivate-lock', () => {
 
   isLocked = false;
 
-  // 1. Exit Fullscreen and Kiosk mode
-  mainWindow.setKiosk(false);
+  // 1. Exit Fullscreen
   mainWindow.setFullScreen(false);
-  mainWindow.setAlwaysOnTop(false);
   mainWindow.setResizable(true);
 
   // Restore normal size (optional, could be default)
@@ -166,6 +162,14 @@ ipcMain.on('deactivate-lock', () => {
 });
 
 app.on('ready', () => {
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    if (permission === 'media') {
+      callback(true);
+    } else {
+      callback(false);
+    }
+  });
+
   createWindow();
 });
 
