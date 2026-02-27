@@ -4,6 +4,7 @@ const cors = require('cors');
 const http = require('http');
 const { initDB } = require('./config/db');
 const { initSocket } = require('./utils/socketSetup');
+const reviewRoutes = require('./routes/reviewRoutes');
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
@@ -32,18 +33,19 @@ app.use('/monitor', monitoringRoutes);
 app.use('/submission', submissionRoutes);
 app.use('/dashboard', dashboardRoutes);
 app.use('/history', historyRoutes);
+app.use('/api/review', reviewRoutes);
 
 // Database initialization & Server start
 const startServer = async () => {
-    try {
-        await initDB();
-        server.listen(PORT, () => {
-            console.log(`Server is running on port ${PORT}`);
-            console.log(`WebSocket ready on port ${PORT}`);
-        });
-    } catch (error) {
-        console.error('Failed to start server:', error);
-    }
+  try {
+    await initDB();
+    server.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+      console.log(`WebSocket ready on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+  }
 };
 
 startServer();
