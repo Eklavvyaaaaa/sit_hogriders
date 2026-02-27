@@ -19,6 +19,41 @@ const TeacherDashboard = () => {
         };
         fetchExams();
     }, []);
+    const testReviewAPI = async () => {
+        const token = localStorage.getItem("token");
+        if (!token) {
+            alert("No authentication token found.");
+            return;
+        }
+
+        try {
+            const response = await fetch("http://localhost:5001/api/review/15", {
+                method: "GET",
+                headers: {
+                    "Authorization": "Bearer " + token
+                }
+            });
+
+            console.log("Response status:", response.status);
+
+            if (response.status !== 200) {
+                alert("Server error");
+                return;
+            }
+
+            const data = await response.json();
+            console.log("Parsed data:", data);
+
+            if (Array.isArray(data) && data.length === 0) {
+                alert("Review API working. No submissions found.");
+            } else {
+                alert(JSON.stringify(data, null, 2));
+            }
+        } catch (err) {
+            console.error("Error:", err);
+            alert("Backend not reachable");
+        }
+    };
 
     return (
         <div className="min-h-screen bg-slate-900 flex flex-col">
@@ -29,13 +64,21 @@ const TeacherDashboard = () => {
                         <h1 className="text-3xl font-bold text-white mb-2">Teacher Dashboard</h1>
                         <p className="text-slate-400">Manage your exams and monitor live sessions.</p>
                     </div>
-                    <button
-                        onClick={() => navigate('/create-exam')}
-                        className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-semibold shadow-lg shadow-blue-600/20 transition-all active:scale-[0.98]"
-                    >
-                        <PlusCircle size={20} />
-                        <span>Create Exam</span>
-                    </button>
+                    <div className="flex space-x-4">
+                        <button
+                            onClick={testReviewAPI}
+                            className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-semibold shadow-lg shadow-purple-600/20 transition-all active:scale-[0.98]"
+                        >
+                            <span>Test Review API</span>
+                        </button>
+                        <button
+                            onClick={() => navigate('/create-exam')}
+                            className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-semibold shadow-lg shadow-blue-600/20 transition-all active:scale-[0.98]"
+                        >
+                            <PlusCircle size={20} />
+                            <span>Create Exam</span>
+                        </button>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
