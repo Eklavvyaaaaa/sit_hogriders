@@ -113,7 +113,16 @@ const MonitorDashboard = () => {
               return (
                 <div
                   key={student.email}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={isSelected}
                   onClick={() => setSelectedStudentEmail(isSelected ? null : student.email)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedStudentEmail(isSelected ? null : student.email);
+                    }
+                  }}
                   className={`relative overflow-hidden rounded-2xl p-5 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/40 border-2 ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-slate-900 border-slate-600' : 'border-slate-700'} ${status.bg}`}
                 >
                   <div className={`absolute top-0 left-0 w-1 h-full ${status.bg} ${status.border} border-l-4`} />
