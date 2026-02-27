@@ -2,6 +2,9 @@ const { query } = require('../config/db');
 const generateCode = require('../utils/generateCode');
 const { getIO } = require('../utils/socketSetup');
 
+// Configurable join buffer (minutes after exam start)
+const JOIN_BUFFER_MINUTES = 5;
+
 exports.generateClassroom = async (req, res) => {
     try {
         const { examId } = req.body;
@@ -70,6 +73,7 @@ exports.joinClassroom = async (req, res) => {
             return res.status(400).json({ message: 'Classroom code is required' });
         }
 
+        // ── 1. Validate classroom code ──
         const classroomResult = await query('SELECT * FROM classrooms WHERE code = $1', [code]);
         if (classroomResult.rows.length === 0) {
             return res.status(404).json({ message: 'Invalid classroom code' });
@@ -81,24 +85,58 @@ exports.joinClassroom = async (req, res) => {
             return res.status(400).json({ message: 'Classroom code has expired' });
         }
 
+        // ── 2. Validate exam exists ──
         const examResult = await query('SELECT * FROM exams WHERE id = $1', [classroom.exam_id]);
         if (examResult.rows.length === 0) {
             return res.status(404).json({ message: 'Exam not found' });
         }
         const exam = examResult.rows[0];
 
-        // Prevent join if exam is completed
+        // ── 3. Prevent join if exam is completed ──
         if (exam.status === 'completed') {
-            return res.status(400).json({ message: 'Exam has already ended' });
+            return res.status(403).json({ message: 'Exam has already ended' });
         }
 
-        // Check if the student already submitted
-        const existingSubmission = await query('SELECT * FROM submissions WHERE student_id = $1 AND exam_id = $2', [studentId, exam.id]);
+        // ── 4. Buffer time check: if exam is active, enforce 5-min joining window ──
+        if (exam.status === 'active' && exam.end_time) {
+            // Calculate when the exam started: end_time - duration
+            const endTime = new Date(exam.end_time);
+            const startTime = new Date(endTime.getTime() - exam.duration * 60 * 1000);
+            const bufferDeadline = new Date(startTime.getTime() + JOIN_BUFFER_MINUTES * 60 * 1000);
+            const now = new Date();
+
+            if (now > bufferDeadline) {
+                return res.status(403).json({ message: 'Joining window has closed. You can only join within 5 minutes of exam start.' });
+            }
+
+            // Also check: if exam time is already over
+            if (now >= endTime) {
+                return res.status(403).json({ message: 'Exam time has already expired.' });
+            }
+        }
+
+        // ── 5. Check if the student already submitted ──
+        const existingSubmission = await query(
+            'SELECT * FROM submissions WHERE student_id = $1 AND exam_id = $2',
+            [studentId, exam.id]
+        );
         if (existingSubmission.rows.length > 0) {
-            return res.status(400).json({ message: 'You have already submitted this exam' });
+            const sub = existingSubmission.rows[0];
+            if (sub.status === 'submitted' || sub.status === 'finalized') {
+                return res.status(403).json({ message: 'You have already submitted this exam' });
+            }
         }
 
-        // Register student in students_exam junction table
+        // ── 6. Check if the student is flagged/terminated ──
+        const studentExamResult = await query(
+            'SELECT flagged FROM students_exam WHERE student_id = $1 AND exam_id = $2',
+            [studentId, exam.id]
+        );
+        if (studentExamResult.rows.length > 0 && studentExamResult.rows[0].flagged) {
+            return res.status(403).json({ message: 'You have been flagged and cannot rejoin this exam.' });
+        }
+
+        // ── 7. Register student in students_exam junction table ──
         await query(`
             INSERT INTO students_exam (student_id, exam_id)
             VALUES ($1, $2)
@@ -107,7 +145,7 @@ exports.joinClassroom = async (req, res) => {
 
         const io = getIO();
 
-        // Auto-activate exam on first student join
+        // ── 8. Auto-activate exam on first student join ──
         const endTimeStr = new Date(Date.now() + exam.duration * 60 * 1000).toISOString();
         const updateResult = await query(
             "UPDATE exams SET status = 'active', end_time = $1 WHERE id = $2 AND status = 'scheduled' RETURNING end_time",
@@ -131,12 +169,21 @@ exports.joinClassroom = async (req, res) => {
             });
         }
 
+        // Calculate remaining duration for late joiners
+        let remainingDuration = exam.duration;
+        const actualEndTime = exam.end_time || (updateResult.rows.length > 0 ? updateResult.rows[0].end_time : null);
+        if (actualEndTime) {
+            const msRemaining = new Date(actualEndTime).getTime() - Date.now();
+            remainingDuration = Math.max(1, Math.ceil(msRemaining / 60000)); // At least 1 minute
+        }
+
         res.json({
             message: 'Joined successfully',
             examId: exam.id,
             title: exam.title,
-            duration: exam.duration,
-            questions: JSON.parse(exam.questions_json)
+            duration: remainingDuration,
+            questions: JSON.parse(exam.questions_json),
+            endTime: actualEndTime
         });
 
     } catch (error) {
