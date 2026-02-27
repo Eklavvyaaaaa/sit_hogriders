@@ -31,6 +31,12 @@ cd ..
 npm install
 \`\`\`
 
+### 3. ATI Engine Model Download (Required)
+The ATI engine requires the `all-MiniLM-L6-v2` model to be pre-cached locally. From the root directory, run:
+\`\`\`bash
+python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
+\`\`\`
+
 ## Run Scripts
 
 ### Run the completely integrated App (React Dev + Electron Wrapper)

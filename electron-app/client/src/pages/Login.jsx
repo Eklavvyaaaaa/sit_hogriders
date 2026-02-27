@@ -67,14 +67,28 @@ const Login = () => {
         try {
             if (isRegister) {
                 await register(formData.name, formData.email, formData.password, formData.role);
-                setIsRegister(false);
-                alert('Registration successful! Please login.');
+                setIsRegister(false); // Switch to login after successful register
             } else {
                 const user = await login(formData.email, formData.password);
+                console.log("Login successful:", user);
+
+                // Also store token in localStorage for direct API calls
+                const token = document.cookie
+                    .split('; ')
+                    .find(row => row.startsWith('token='))
+                    ?.split('=')[1];
+                if (token) {
+                    localStorage.setItem("token", token);
+                }
+                if (user.role) {
+                    localStorage.setItem("role", user.role);
+                }
+
                 navigate(user.role === 'teacher' ? '/teacher' : '/join');
             }
         } catch (err) {
-            setError(err.response?.data?.message || 'Authentication failed');
+            console.error('Authentication attempt failed:', err);
+            setError(err.response?.data?.message || err.message || 'Authentication failed');
         }
     };
 
