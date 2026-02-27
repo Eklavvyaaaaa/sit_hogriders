@@ -1,4 +1,4 @@
-const { getDB } = require('../config/db');
+const { query } = require('../config/db');
 
 exports.logEvent = async (req, res) => {
     try {
@@ -9,10 +9,8 @@ exports.logEvent = async (req, res) => {
             return res.status(400).json({ message: 'Exam ID and event type are required' });
         }
 
-        const db = getDB();
-
-        await db.run(
-            'INSERT INTO monitoring_logs (user_id, exam_id, event_type) VALUES (?, ?, ?)',
+        await query(
+            'INSERT INTO monitoring_logs (user_id, exam_id, event_type) VALUES ($1, $2, $3)',
             [studentId, examId, eventType]
         );
 
@@ -28,25 +26,23 @@ exports.getLogs = async (req, res) => {
         const { examId } = req.params;
         const teacherId = req.user.id;
 
-        const db = getDB();
-
         // Verify teacher owns this exam
-        const exam = await db.get('SELECT * FROM exams WHERE id = ? AND teacher_id = ?', [examId, teacherId]);
-        if (!exam) {
+        const examResult = await query('SELECT * FROM exams WHERE id = $1 AND teacher_id = $2', [examId, teacherId]);
+        if (examResult.rows.length === 0) {
             return res.status(403).json({ message: 'Unauthorized access to these logs' });
         }
 
-        const logs = await db.all(\`
-      SELECT m.*, u.name as student_name, u.email as student_email 
-      FROM monitoring_logs m
-      JOIN users u ON m.user_id = u.id
-      WHERE m.exam_id = ?
-      ORDER BY m.timestamp DESC
-    \`, [examId]);
+        const logsResult = await query(`
+            SELECT m.*, u.name as student_name, u.email as student_email 
+            FROM monitoring_logs m
+            JOIN users u ON m.user_id = u.id
+            WHERE m.exam_id = $1
+            ORDER BY m.timestamp DESC
+        `, [examId]);
 
-    res.json(logs);
-  } catch (error) {
-    console.error('Get logs error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
+        res.json(logsResult.rows);
+    } catch (error) {
+        console.error('Get logs error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
 };

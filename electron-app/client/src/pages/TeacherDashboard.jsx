@@ -62,27 +62,27 @@ const TeacherDashboard = () => {
 
                                 <div className="pt-4 border-t border-slate-700 grid grid-cols-2 gap-3">
                                     <button
-                                        onClick={() => navigate(\`/monitor/\${exam.id}\`)}
-                                    className="flex items-center justify-center space-x-2 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-sm font-medium transition-colors"
-                  >
-                                    <Activity size={16} />
-                                    <span>Live Monitor</span>
-                                </button>
-                                <button
-                                    onClick={() => navigate(\`/monitor/\${exam.id}\`)} // For simplicity sharing monitoring dashboard
-                                className="flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-indigo-600/20"
-                  >
-                                <Eye size={16} />
-                                <span>View Logs</span>
-                            </button>
+                                        onClick={() => navigate(`/monitor/${exam.id}`)}
+                                        className="flex items-center justify-center space-x-2 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-sm font-medium transition-colors"
+                                    >
+                                        <Activity size={16} />
+                                        <span>Live Monitor</span>
+                                    </button>
+                                    <button
+                                        onClick={() => navigate(`/monitor/${exam.id}`)} // For simplicity sharing monitoring dashboard
+                                        className="flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-indigo-600/20"
+                                    >
+                                        <Eye size={16} />
+                                        <span>View Logs</span>
+                                    </button>
+                                </div>
+                            </div>
+                        ))
+                    )}
                 </div>
-            </div>
-            ))
-          )}
-        </div>
-      </div >
-    </div >
-  );
+            </div >
+        </div >
+    );
 };
 
 export default TeacherDashboard;
