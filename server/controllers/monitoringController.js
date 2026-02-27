@@ -217,11 +217,18 @@ exports.requestLastChance = async (req, res) => {
                 WHERE user_id = $1 AND exam_id = $2
             `, [studentId, examId]);
 
-            // Reset violations safely
+            // Reset violations safely and unsubmit
             await client.query(`
                 UPDATE students_exam 
-                SET terminated = false, violation_count = 0, last_chance_used = true
+                SET terminated = false, violation_count = 0, last_chance_used = true, submitted = false, flagged = false
                 WHERE student_id = $1 AND exam_id = $2
+            `, [studentId, examId]);
+
+            // Reconcile submissions table if it was auto-submitted
+            await client.query(`
+                UPDATE submissions
+                SET status = 'in_progress', submitted_at = NULL
+                WHERE student_id = $1 AND exam_id = $2 AND status = 'submitted'
             `, [studentId, examId]);
 
             await client.query('COMMIT');
