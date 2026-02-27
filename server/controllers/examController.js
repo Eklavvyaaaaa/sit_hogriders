@@ -308,6 +308,7 @@ exports.getExamStats = async (req, res) => {
             JOIN users u ON s.student_id = u.id
             LEFT JOIN students_exam se ON s.student_id = se.student_id AND s.exam_id = se.exam_id
             WHERE s.exam_id = $1 AND s.status = 'in_progress'
+            GROUP BY s.student_id, u.name, u.email, se.flagged
             ORDER BY u.name ASC
         `, [id]);
 
