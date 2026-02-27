@@ -4,6 +4,7 @@
   "description": "A complete full-stack exam monitoring solution that uses AI (MediaPipe) to track student behavior during an exam. The student application runs securely in an Electron window (blocking other apps/shortcuts), while teachers have a web dashboard to create exams, generate classroom codes, and view live monitoring logs.",
   "main": "index.js",
   "scripts": {
+    "dev": "npx concurrently \"cd server && npm start\" \"cd electron-app && npm start\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
