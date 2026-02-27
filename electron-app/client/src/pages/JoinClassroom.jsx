@@ -39,7 +39,10 @@ const JoinClassroom = () => {
     const handleJoin = async (e) => {
         e.preventDefault();
         const fullCode = code.join('');
-        if (fullCode.length !== 6) return;
+        if (fullCode.length !== 6) {
+            setError('Please enter a 6-digit join code');
+            return;
+        }
 
         setError('');
         setLoading(true);
@@ -145,6 +148,7 @@ const JoinClassroom = () => {
                                                 id={`code-${i}`}
                                                 type="text"
                                                 maxLength={1}
+                                                aria-label={`code digit ${i + 1} of ${code.length}`}
                                                 className={`w-full aspect-square text-center text-2xl font-black rounded-xl border-2 focus:ring-0 outline-none transition-all uppercase
                                                     ${char
                                                         ? 'border-blue-600 bg-blue-50 text-blue-700'

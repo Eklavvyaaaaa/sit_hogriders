@@ -20,7 +20,7 @@
 body {
   margin: 0;
   padding: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   background-color: var(--color-brand-bg);
   color: #1e293b;
   overflow-x: hidden;
@@ -152,4 +152,19 @@ body {
   animation: line-draw 0.8s ease-out forwards;
   animation-delay: 1.8s;
   opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .animate-badge,
+  .animate-avatar,
+  .animate-line-1,
+  .animate-line-2,
+  .animate-line-3,
+  .animate-line-4,
+  .animate-scale,
+  .animate-fade-in {
+    animation: none !important;
+    transition: none !important;
+  }
 }
