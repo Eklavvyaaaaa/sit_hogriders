@@ -1,8 +1,11 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
-    onWindowBlur: (callback) => ipcRenderer.on('window-blur', () => callback()),
-    onWindowFocus: (callback) => ipcRenderer.on('window-focus', () => callback()),
-    removeBlurListeners: () => ipcRenderer.removeAllListeners('window-blur'),
-    removeFocusListeners: () => ipcRenderer.removeAllListeners('window-focus')
+    activateLock: () => ipcRenderer.send('activate-lock'),
+    deactivateLock: () => ipcRenderer.send('deactivate-lock'),
+    onFocusLost: (callback) => {
+        const listener = () => callback();
+        ipcRenderer.on('focus-lost', listener);
+        return () => ipcRenderer.removeListener('focus-lost', listener);
+    }
 });

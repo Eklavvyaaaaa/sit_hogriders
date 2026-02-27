@@ -129,18 +129,18 @@ const CreateExam = () => {
                                             <div key={oIndex} className="flex items-center space-x-3">
                                                 <input
                                                     type="radio"
-                                                    name={\`correct-\${qIndex}\`}
-                                                checked={q.correctOption === oIndex}
-                                                onChange={() => updateQuestion(qIndex, 'correctOption', oIndex)}
-                                                className="w-4 h-4 text-blue-500 bg-slate-900 border-slate-600 focus:ring-blue-500"
-                        />
+                                                    name={`correct-${qIndex}`}
+                                                    checked={q.correctOption === oIndex}
+                                                    onChange={() => updateQuestion(qIndex, 'correctOption', oIndex)}
+                                                    className="w-4 h-4 text-blue-500 bg-slate-900 border-slate-600 focus:ring-blue-500"
+                                                />
                                                 <input
                                                     type="text"
                                                     className="flex-1 p-2 bg-slate-900 border border-slate-700 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-white text-sm"
-                                                    placeholder={\`Option \${oIndex + 1}\`}
-                                                value={opt}
-                                                onChange={e => updateQuestionOption(qIndex, oIndex, e.target.value)}
-                        />
+                                                    placeholder={`Option ${oIndex + 1}`}
+                                                    value={opt}
+                                                    onChange={e => updateQuestionOption(qIndex, oIndex, e.target.value)}
+                                                />
                                             </div>
                                         ))}
                                     </div>
