@@ -14,7 +14,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
-      devTools: true // Enable for now, will be disabled during lock
+      devTools: isDev // Only enable devTools in development environment
     }
   });
 
@@ -31,41 +31,51 @@ function createWindow() {
     }
   });
 
+  // Security constraints when locked
+  mainWindow.webContents.on('devtools-opened', () => {
+    if (isLocked) {
+      mainWindow.webContents.closeDevTools();
+    }
+  });
+
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (isLocked) {
+      try {
+        const parsedUrl = new URL(url);
+        if (parsedUrl.protocol !== 'file:' && parsedUrl.hostname !== 'localhost') {
+          event.preventDefault();
+        }
+      } catch (e) {
+        // If URL parsing fails, prevent navigation to be safe
+        event.preventDefault();
+      }
+    }
+  });
+
+  mainWindow.webContents.setWindowOpenHandler(() => {
+    return isLocked ? { action: 'deny' } : { action: 'allow' };
+  });
+
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (isLocked) {
+      const isCopy = input.control && input.key.toLowerCase() === 'c';
+      const isPaste = input.control && input.key.toLowerCase() === 'v';
+      const isCut = input.control && input.key.toLowerCase() === 'x';
+      const isReload = input.control && input.key.toLowerCase() === 'r';
+      const isF5 = input.key === 'F5';
+      const isDevTools = input.control && input.shift && input.key.toLowerCase() === 'i';
+
+      if (isCopy || isPaste || isCut || isReload || isF5 || isDevTools) {
+        event.preventDefault();
+        console.log(`${input.key} blocked during exam`);
+      }
+    }
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
 }
-
-// Security Enforcement Logic
-const registerShortcuts = () => {
-  globalShortcut.register('CommandOrControl+C', () => {
-    console.log('Copy blocked during exam');
-  });
-  globalShortcut.register('CommandOrControl+V', () => {
-    console.log('Paste blocked during exam');
-  });
-  globalShortcut.register('CommandOrControl+X', () => {
-    console.log('Cut blocked during exam');
-  });
-  globalShortcut.register('CommandOrControl+R', () => {
-    console.log('Reload blocked during exam');
-  });
-  globalShortcut.register('F5', () => {
-    console.log('F5 blocked during exam');
-  });
-  globalShortcut.register('CommandOrControl+Shift+I', () => {
-    console.log('DevTools blocked during exam');
-  });
-};
-
-const unregisterShortcuts = () => {
-  globalShortcut.unregister('CommandOrControl+C');
-  globalShortcut.unregister('CommandOrControl+V');
-  globalShortcut.unregister('CommandOrControl+X');
-  globalShortcut.unregister('CommandOrControl+R');
-  globalShortcut.unregister('F5');
-  globalShortcut.unregister('CommandOrControl+Shift+I');
-};
 
 // IPC Listeners for SmartLock
 ipcMain.on('activate-lock', () => {
@@ -79,29 +89,11 @@ ipcMain.on('activate-lock', () => {
   mainWindow.setAlwaysOnTop(true, 'screen-saver');
   mainWindow.setResizable(false);
 
-  // 2. Disable DevTools
+  // 2. Disable DevTools dynamically if open
   mainWindow.webContents.closeDevTools();
-  mainWindow.webContents.on('devtools-opened', () => {
-    mainWindow.webContents.closeDevTools();
-  });
 
   // 3. Disable Menu Bar
   mainWindow.setMenuBarVisibility(false);
-
-  // 4. Block Shortcuts
-  registerShortcuts();
-
-  // 5. Prevent Navigation to External URLs
-  mainWindow.webContents.on('will-navigate', (event, url) => {
-    if (isLocked && !url.includes('localhost') && !url.includes('file://')) {
-      event.preventDefault();
-    }
-  });
-
-  // 6. Prevent New Window Creation
-  mainWindow.webContents.setWindowOpenHandler(() => {
-    return { action: 'deny' };
-  });
 
   console.log('SmartLock Activated');
 });
@@ -122,7 +114,6 @@ ipcMain.on('deactivate-lock', () => {
   mainWindow.center();
 
   // 2. Restore restrictions
-  unregisterShortcuts();
   mainWindow.setMenuBarVisibility(true);
 
   console.log('SmartLock Deactivated');
@@ -133,7 +124,7 @@ app.on('ready', () => {
 });
 
 app.on('will-quit', () => {
-  globalShortcut.unregisterAll();
+  // globalShortcut.unregisterAll() removed as we use before-input-event now
 });
 
 app.on('window-all-closed', () => {

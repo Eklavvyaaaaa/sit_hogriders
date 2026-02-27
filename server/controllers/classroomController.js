@@ -18,21 +18,32 @@ exports.generateClassroom = async (req, res) => {
 
         let code;
         let isUnique = false;
+        let insertedId;
 
-        while (!isUnique) {
+        const maxAttempts = 10;
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
             code = generateCode();
-            const existing = await query('SELECT * FROM classrooms WHERE code = $1', [code]);
-            if (existing.rows.length === 0) {
+            try {
+                const result = await query(
+                    'INSERT INTO classrooms (code, exam_id, teacher_id) VALUES ($1, $2, $3) RETURNING id',
+                    [code, examId, teacherId]
+                );
                 isUnique = true;
+                insertedId = result.rows[0].id;
+                break;
+            } catch (dbError) {
+                if (dbError.code === '23505') { // PostgreSQL unique violation
+                    continue; // Retry
+                }
+                throw dbError;
             }
         }
 
-        const result = await query(
-            'INSERT INTO classrooms (code, exam_id, teacher_id) VALUES ($1, $2, $3) RETURNING id',
-            [code, examId, teacherId]
-        );
+        if (!isUnique) {
+            return res.status(500).json({ message: 'Failed to generate a unique classroom code' });
+        }
 
-        res.status(201).json({ message: 'Classroom generated successfully', code, classroomId: result.rows[0].id });
+        res.status(201).json({ message: 'Classroom generated successfully', code, classroomId: insertedId });
     } catch (error) {
         console.error('Generate classroom error:', error);
         res.status(500).json({ message: 'Server error' });

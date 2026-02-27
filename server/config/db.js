@@ -1,9 +1,7 @@
 const { Pool } = require('pg');
 
-// Create a connection pool using the Neon PostgreSQL connection string
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  connectionString: process.env.DATABASE_URL
 });
 
 /**
@@ -16,20 +14,6 @@ const initDB = async () => {
     const client = await pool.connect();
     console.log('Connected to Neon PostgreSQL database.');
     client.release();
-
-    // Drop existing tables to resolve schema conflicts (UUID vs SERIAL)
-    await pool.query(`
-      DROP TABLE IF EXISTS final_grades CASCADE;
-      DROP TABLE IF EXISTS ati_scores CASCADE;
-      DROP TABLE IF EXISTS pac_scores CASCADE;
-      DROP TABLE IF EXISTS nlp_evaluations CASCADE;
-      DROP TABLE IF EXISTS answers CASCADE;
-      DROP TABLE IF EXISTS monitoring_logs CASCADE;
-      DROP TABLE IF EXISTS submissions CASCADE;
-      DROP TABLE IF EXISTS classrooms CASCADE;
-      DROP TABLE IF EXISTS exams CASCADE;
-      DROP TABLE IF EXISTS users CASCADE;
-    `);
 
     // Create Tables
     await pool.query(`
