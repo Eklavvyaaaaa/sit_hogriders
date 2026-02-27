@@ -23,7 +23,10 @@ async function authorizeExamParticipant(userId, examId) {
 
 exports.getMessages = async (req, res) => {
     try {
-        const { examId } = req.params;
+        const examId = parseInt(req.params.examId, 10);
+        if (!Number.isInteger(examId) || examId <= 0) {
+            return res.status(400).json({ message: 'Invalid exam ID' });
+        }
         const userId = req.user.id;
 
         // Authorize: must be teacher or enrolled student
@@ -50,8 +53,21 @@ exports.sendMessage = async (req, res) => {
         const { examId, message } = req.body;
         const senderId = req.user.id;
 
+        // Validate inputs
+        const parsedExamId = parseInt(examId, 10);
+        if (!Number.isInteger(parsedExamId) || parsedExamId <= 0) {
+            return res.status(400).json({ message: 'Invalid exam ID' });
+        }
+        if (!message || typeof message !== 'string' || !message.trim()) {
+            return res.status(400).json({ message: 'Message cannot be empty' });
+        }
+        if (message.length > 2000) {
+            return res.status(400).json({ message: 'Message too long (max 2000 characters)' });
+        }
+        const trimmedMessage = message.trim();
+
         // Authorize: must be teacher or enrolled student
-        if (!(await authorizeExamParticipant(senderId, examId))) {
+        if (!(await authorizeExamParticipant(senderId, parsedExamId))) {
             return res.status(403).json({ message: 'Not authorized to send messages in this chat' });
         }
 
@@ -59,7 +75,7 @@ exports.sendMessage = async (req, res) => {
             INSERT INTO chat_messages (exam_id, sender_id, message_text)
             VALUES ($1, $2, $3)
             RETURNING id, exam_id, sender_id, message_text, created_at
-        `, [examId, senderId, message]);
+        `, [parsedExamId, senderId, trimmedMessage]);
 
         const newMsg = result.rows[0];
 
@@ -72,7 +88,7 @@ exports.sendMessage = async (req, res) => {
         // Broadcast to everyone in the chat room via Socket.io
         const io = getIO();
         if (io) {
-            io.to(`chat:${examId}`).emit('receive:message', newMsg);
+            io.to(`chat:${parsedExamId}`).emit('receive:message', newMsg);
         }
 
         res.status(201).json(newMsg);

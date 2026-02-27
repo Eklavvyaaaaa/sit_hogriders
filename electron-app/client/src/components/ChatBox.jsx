@@ -11,6 +11,7 @@ const ChatBox = ({ examId }) => {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
     const [unreadCount, setUnreadCount] = useState(0);
+    const [isSending, setIsSending] = useState(false);
     const socketRef = useRef(null);
     const messagesEndRef = useRef(null);
     const isOpenRef = useRef(false);
@@ -36,7 +37,14 @@ const ChatBox = ({ examId }) => {
         });
         socketRef.current = socket;
 
-        socket.emit('join:chat', examId);
+        // Join chat room after connection (handles initial connect + reconnects)
+        socket.on('connect', () => {
+            socket.emit('join:chat', examId);
+        });
+
+        socket.on('connect_error', (err) => {
+            console.error('Socket connection error:', err.message);
+        });
 
         socket.on('receive:message', (msg) => {
             // Deduplicate: the sender already adds the message from HTTP response
@@ -50,6 +58,9 @@ const ChatBox = ({ examId }) => {
         });
 
         return () => {
+            socket.off('connect');
+            socket.off('connect_error');
+            socket.off('receive:message');
             socket.disconnect();
         };
     }, [examId, user]);
@@ -64,8 +75,9 @@ const ChatBox = ({ examId }) => {
 
     const handleSendMessage = async (e) => {
         e.preventDefault();
-        if (!newMessage.trim()) return;
+        if (!newMessage.trim() || isSending) return;
 
+        setIsSending(true);
         try {
             const res = await api.post('/chat', {
                 examId,
@@ -81,6 +93,8 @@ const ChatBox = ({ examId }) => {
             setNewMessage('');
         } catch (err) {
             console.error('Failed to send message', err);
+        } finally {
+            setIsSending(false);
         }
     };
 
@@ -96,7 +110,7 @@ const ChatBox = ({ examId }) => {
                     <MessageSquare size={24} />
                     {unreadCount > 0 && (
                         <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center border-2 border-slate-900">
-                            {unreadCount}
+                            {unreadCount > 99 ? '99+' : unreadCount}
                         </span>
                     )}
                 </button>
@@ -124,7 +138,7 @@ const ChatBox = ({ examId }) => {
                             messages.map((msg, idx) => {
                                 const isMine = msg.sender_id === user.id;
                                 return (
-                                    <div key={idx} className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}>
+                                    <div key={msg.id || idx} className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}>
                                         <span className="text-[10px] text-slate-500 mb-1 px-1 font-semibold uppercase tracking-wider">
                                             {isMine ? 'You' : `${msg.sender_name} (${msg.sender_role})`}
                                         </span>
@@ -153,7 +167,7 @@ const ChatBox = ({ examId }) => {
                         />
                         <button
                             type="submit"
-                            disabled={!newMessage.trim()}
+                            disabled={!newMessage.trim() || isSending}
                             className="bg-blue-600 text-white p-2.5 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg shadow-blue-900/20"
                         >
                             <Send size={18} />
