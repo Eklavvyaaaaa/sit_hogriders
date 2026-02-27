@@ -1,4 +1,5 @@
 const { Server } = require('socket.io');
+const jwt = require('jsonwebtoken');
 
 let io = null;
 
@@ -13,8 +14,23 @@ function initSocket(httpServer) {
         }
     });
 
+    // Socket-level JWT authentication middleware
+    io.use((socket, next) => {
+        const token = socket.handshake.auth?.token;
+        if (!token) {
+            return next(new Error('Authentication required'));
+        }
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            socket.user = decoded;
+            next();
+        } catch (err) {
+            return next(new Error('Invalid or expired token'));
+        }
+    });
+
     io.on('connection', (socket) => {
-        console.log(`Socket connected: ${socket.id}`);
+        console.log(`Socket connected: ${socket.id} (user: ${socket.user?.id})`);
 
         // Teachers join an exam room to receive updates
         socket.on('join:exam', (examId) => {
@@ -23,12 +39,11 @@ function initSocket(httpServer) {
                 console.log(`Invalid examId provided for socket join: ${examId}`);
                 return;
             }
-            // Ideally we'd authenticate the token here, but basic validation is a start
             socket.join(`exam:${parsedId}`);
             console.log(`Socket ${socket.id} joined exam:${parsedId}`);
         });
 
-        // Chat specific events to isolate from monitoring
+        // Chat room join (authenticated via middleware above)
         socket.on('join:chat', (examId) => {
             const parsedId = parseInt(examId, 10);
             if (!parsedId || isNaN(parsedId) || parsedId <= 0) return;
@@ -36,13 +51,8 @@ function initSocket(httpServer) {
             console.log(`Socket ${socket.id} joined chat:${parsedId}`);
         });
 
-        socket.on('send:message', (data) => {
-            const { examId, message } = data;
-            const parsedId = parseInt(examId, 10);
-            if (!parsedId || isNaN(parsedId) || parsedId <= 0) return;
-            // Broadcast to everyone else in the room
-            socket.to(`chat:${parsedId}`).emit('receive:message', message);
-        });
+        // Note: send:message removed — broadcasting is handled by the
+        // authenticated HTTP POST /chat endpoint in chatController.sendMessage
 
         socket.on('disconnect', () => {
             console.log(`Socket disconnected: ${socket.id}`);
@@ -60,3 +70,4 @@ function getIO() {
 }
 
 module.exports = { initSocket, getIO };
+
