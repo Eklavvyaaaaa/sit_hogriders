@@ -2,6 +2,9 @@ const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const { query } = require('../config/db');
 
+// In-memory cache: userId -> { name, role }
+const userInfoCache = new Map();
+
 let io = null;
 
 /**
@@ -86,6 +89,15 @@ function initSocket(httpServer) {
                 }
                 socket.join(`chat:${parsedId}`);
                 console.log(`Socket ${socket.id} joined chat:${parsedId}`);
+
+                // Cache user info on first join to avoid DB lookups per message
+                if (!userInfoCache.has(socket.user.id)) {
+                    const userRes = await query('SELECT name, role FROM users WHERE id = $1', [socket.user.id]);
+                    if (userRes.rows.length > 0) {
+                        userInfoCache.set(socket.user.id, userRes.rows[0]);
+                    }
+                }
+
                 if (typeof callback === 'function') callback({ success: true });
             } catch (err) {
                 console.error('Error in join:chat auth:', err);
@@ -93,8 +105,54 @@ function initSocket(httpServer) {
             }
         });
 
-        // Note: send:message removed — broadcasting is handled by the
-        // authenticated HTTP POST /chat endpoint in chatController.sendMessage
+        // Fast socket-based message sending (bypasses HTTP)
+        socket.on('send:message', async ({ examId, message }, callback) => {
+            try {
+                const parsedId = parseInt(examId, 10);
+                if (!parsedId || isNaN(parsedId) || parsedId <= 0) {
+                    if (typeof callback === 'function') callback({ error: 'Invalid exam ID' });
+                    return;
+                }
+                if (!message || typeof message !== 'string' || !message.trim()) {
+                    if (typeof callback === 'function') callback({ error: 'Message empty' });
+                    return;
+                }
+                const trimmed = message.trim().slice(0, 2000);
+
+                // Verify user is in the chat room (already authorized on join)
+                const rooms = socket.rooms;
+                if (!rooms.has(`chat:${parsedId}`)) {
+                    if (typeof callback === 'function') callback({ error: 'Not in chat room' });
+                    return;
+                }
+
+                // Insert into DB
+                const result = await query(
+                    `INSERT INTO chat_messages (exam_id, sender_id, message_text) VALUES ($1, $2, $3) RETURNING id, exam_id, sender_id, message_text, created_at`,
+                    [parsedId, socket.user.id, trimmed]
+                );
+                const newMsg = result.rows[0];
+
+                // Attach cached user info (no extra DB query)
+                const cached = userInfoCache.get(socket.user.id);
+                if (cached) {
+                    newMsg.sender_name = cached.name;
+                    newMsg.sender_role = cached.role;
+                } else {
+                    newMsg.sender_name = 'Unknown';
+                    newMsg.sender_role = 'student';
+                }
+
+                // Broadcast to all in chat room
+                io.to(`chat:${parsedId}`).emit('receive:message', newMsg);
+
+                // Acknowledge to sender with the saved message
+                if (typeof callback === 'function') callback({ success: true, msg: newMsg });
+            } catch (err) {
+                console.error('Error in send:message:', err);
+                if (typeof callback === 'function') callback({ error: 'Server error' });
+            }
+        });
 
         socket.on('disconnect', () => {
             console.log(`Socket disconnected: ${socket.id}`);

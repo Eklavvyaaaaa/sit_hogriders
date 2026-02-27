@@ -48,8 +48,9 @@ exports.generateClassroom = async (req, res) => {
 
         const exam = examResult.rows[0];
 
-        // Calculate expiration: now + exam duration (in minutes) + 30 min buffer
-        const expiresAt = new Date(Date.now() + (exam.duration + 30) * 60 * 1000);
+        // Calculate expiration using DB time: now + exam duration + 30 min buffer
+        const expResult = await query("SELECT (NOW() + $1 * INTERVAL '1 minute') as expires_at", [exam.duration + 30]);
+        const expiresAt = expResult.rows[0].expires_at;
 
         let code;
         let isUnique = false;
@@ -61,7 +62,7 @@ exports.generateClassroom = async (req, res) => {
             try {
                 const result = await query(
                     'INSERT INTO classrooms (code, exam_id, teacher_id, expires_at) VALUES ($1, $2, $3, $4) RETURNING id',
-                    [code, examId, teacherId, expiresAt.toISOString()]
+                    [code, examId, teacherId, expiresAt]
                 );
                 isUnique = true;
                 insertedId = result.rows[0].id;
@@ -82,7 +83,7 @@ exports.generateClassroom = async (req, res) => {
             message: 'Classroom generated successfully',
             code,
             classroomId: insertedId,
-            expiresAt: expiresAt.toISOString()
+            expiresAt: expiresAt
         });
     } catch (error) {
         console.error('Generate classroom error:', error);
@@ -132,21 +133,22 @@ exports.joinClassroom = async (req, res) => {
             return res.status(403).json({ message: 'Exam has already ended' });
         }
 
-        // ── 4. Buffer time check: if exam is active, enforce 5-min joining window ──
+        // ── 4. Buffer time check: if exam is active, enforce join window using DB time ──
         if (exam.status === 'active' && exam.end_time) {
-            // Calculate when the exam started: end_time - duration
-            const endTime = new Date(exam.end_time);
-            const startTime = new Date(endTime.getTime() - exam.duration * 60 * 1000);
-            const bufferDeadline = new Date(startTime.getTime() + JOIN_BUFFER_MINUTES * 60 * 1000);
-            const now = new Date();
+            const timeCheck = await query(`
+                SELECT
+                    NOW() >= end_time AS is_expired,
+                    NOW() > (end_time - ($1 || ' minutes')::INTERVAL + ($2 || ' minutes')::INTERVAL) AS buffer_closed
+                FROM exams WHERE id = $3
+            `, [exam.duration, JOIN_BUFFER_MINUTES, exam.id]);
 
-            if (now > bufferDeadline) {
-                return res.status(403).json({ message: 'Joining window has closed. You can only join within 5 minutes of exam start.' });
-            }
-
-            // Also check: if exam time is already over
-            if (now >= endTime) {
-                return res.status(403).json({ message: 'Exam time has already expired.' });
+            if (timeCheck.rows.length > 0) {
+                if (timeCheck.rows[0].is_expired) {
+                    return res.status(403).json({ message: 'Exam time has already expired.' });
+                }
+                if (timeCheck.rows[0].buffer_closed) {
+                    return res.status(403).json({ message: 'Joining window has closed. You can only join within 5 minutes of exam start.' });
+                }
             }
         }
 
@@ -177,11 +179,10 @@ exports.joinClassroom = async (req, res) => {
 
         const io = getIO();
 
-        // ── 8. Auto-activate exam on first student join ──
-        const endTimeStr = new Date(Date.now() + exam.duration * 60 * 1000).toISOString();
+        // ── 8. Auto-activate exam on first student join (use DB time) ──
         const updateResult = await query(
-            "UPDATE exams SET status = 'active', end_time = $1 WHERE id = $2 AND status = 'scheduled' RETURNING end_time",
-            [endTimeStr, exam.id]
+            "UPDATE exams SET status = 'active', end_time = NOW() + ($1 || ' minutes')::INTERVAL WHERE id = $2 AND status = 'scheduled' RETURNING end_time",
+            [exam.duration, exam.id]
         );
 
         if (updateResult.rowCount > 0 && io) {
@@ -220,30 +221,29 @@ exports.joinClassroom = async (req, res) => {
             }
         }
 
-        // ── 10. Re-run buffer/expiry checks against authoritative end_time ──
-        if (actualEndTime) {
-            const freshEndTime = new Date(actualEndTime);
-            const now = new Date();
-
-            // Reject if exam has already expired
-            if (now >= freshEndTime) {
-                return res.status(403).json({ message: 'Exam time has already expired.' });
-            }
-
-            // Reject if join buffer window has closed
-            const freshStartTime = new Date(freshEndTime.getTime() - exam.duration * 60 * 1000);
-            const freshBufferDeadline = new Date(freshStartTime.getTime() + JOIN_BUFFER_MINUTES * 60 * 1000);
-            if (now > freshBufferDeadline) {
-                return res.status(403).json({ message: 'Joining window has closed. You can only join within 5 minutes of exam start.' });
-            }
-        }
-
-        // Calculate remaining duration for late joiners
+        // ── 10. Re-run buffer/expiry checks against authoritative end_time using DB time ──
         let remainingDuration = exam.duration;
         if (actualEndTime) {
-            const msRemaining = new Date(actualEndTime).getTime() - Date.now();
-            // Only apply minimum-duration if exam hasn't expired (already guarded above)
-            remainingDuration = Math.max(1, Math.ceil(msRemaining / 60000));
+            const freshCheck = await query(`
+                SELECT
+                    NOW() >= $1::TIMESTAMPTZ AS is_expired,
+                    NOW() > ($1::TIMESTAMPTZ - ($2 || ' minutes')::INTERVAL + ($3 || ' minutes')::INTERVAL) AS buffer_closed,
+                    EXTRACT(EPOCH FROM ($1::TIMESTAMPTZ - NOW())) AS remaining_seconds
+                `, [actualEndTime, exam.duration, JOIN_BUFFER_MINUTES]);
+
+            if (freshCheck.rows.length > 0) {
+                const { is_expired, buffer_closed, remaining_seconds } = freshCheck.rows[0];
+
+                if (is_expired) {
+                    return res.status(403).json({ message: 'Exam time has already expired.' });
+                }
+                if (buffer_closed) {
+                    return res.status(403).json({ message: 'Joining window has closed. You can only join within 5 minutes of exam start.' });
+                }
+
+                // remaining_seconds comes from DB, so no local clock mismatch
+                remainingDuration = Math.max(1, Math.ceil(remaining_seconds / 60));
+            }
         }
 
         // ── 10. Sanitize questions: strip grading fields before sending to student ──

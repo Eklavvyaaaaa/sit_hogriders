@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import api from '../services/api';
-import { ShieldAlert, RefreshCw, EyeOff, UserSearch, AlertCircle, Download, Flag, BarChart3 } from 'lucide-react';
+import { ShieldAlert, RefreshCw, EyeOff, UserSearch, AlertCircle, Download, Flag, BarChart3, ArrowLeft } from 'lucide-react';
 import ChatBox from '../components/ChatBox';
 
 const MonitorDashboard = () => {
@@ -80,195 +80,166 @@ const MonitorDashboard = () => {
   const getEventIcon = (type) => {
     if (type.includes('No face')) return <EyeOff size={16} className="text-red-500" />;
     if (type.includes('Multiple faces')) return <UserSearch size={16} className="text-orange-500" />;
-    return <AlertCircle size={16} className="text-yellow-500" />;
+    return <AlertCircle size={16} className="text-amber-500" />;
   };
 
   const getSeverityBadge = (severity) => {
     const colors = {
-      low: 'bg-yellow-900/20 text-yellow-300 border-yellow-900/50',
-      medium: 'bg-orange-900/20 text-orange-300 border-orange-900/50',
-      high: 'bg-red-900/20 text-red-300 border-red-900/50'
+      low: 'bg-amber-50 text-amber-700 border-amber-200',
+      medium: 'bg-orange-50 text-orange-700 border-orange-200',
+      high: 'bg-red-50 text-red-700 border-red-200'
     };
     return colors[severity] || colors.medium;
   };
 
+  const getStudentStatusColor = (violationCount) => {
+    if (violationCount >= 10) return { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', dot: 'bg-red-500', label: 'Critical' };
+    if (violationCount >= 5) return { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', dot: 'bg-orange-500', label: 'Attention' };
+    return { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', dot: 'bg-emerald-500', label: 'On Track' };
+  };
+
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col">
+    <div className="min-h-screen bg-white flex flex-col font-inter">
       <Navbar />
       <div className="flex-1 max-w-6xl w-full mx-auto p-8">
 
+        {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center space-x-4">
-            <div className="bg-red-900/30 p-3 rounded-2xl border border-red-500/20">
-              <ShieldAlert size={32} className="text-red-500" />
-            </div>
+            <button onClick={() => navigate('/teacher')} className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+              <ArrowLeft size={20} />
+            </button>
             <div>
-              <h1 className="text-3xl font-bold text-white mb-1">Live Monitor Logs</h1>
-              <p className="text-slate-400">Exam ID: <span className="text-blue-400 font-mono tracking-wider">{examId}</span></p>
+              <p className="text-[11px] font-black text-blue-600 uppercase tracking-widest">Monitoring</p>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">Live Monitor</h1>
+              <p className="text-slate-400 text-sm font-medium">Exam ID: <span className="text-blue-600 font-mono">{examId}</span></p>
             </div>
           </div>
-          <div className="flex space-x-3">
-            <button
-              onClick={handleViewFlagged}
-              className="flex items-center space-x-2 bg-red-900/30 hover:bg-red-900/50 text-red-400 px-4 py-2 rounded-xl border border-red-900/50 transition-colors"
-            >
-              <Flag size={18} />
+          <div className="flex space-x-2">
+            <button onClick={handleViewFlagged} className="flex items-center space-x-1.5 bg-red-50 hover:bg-red-100 text-red-600 px-4 py-2 rounded-lg border border-red-200 transition-colors text-sm font-semibold">
+              <Flag size={16} />
               <span>Flagged</span>
             </button>
-            <button
-              onClick={handleExportCSV}
-              className="flex items-center space-x-2 bg-emerald-900/30 hover:bg-emerald-900/50 text-emerald-400 px-4 py-2 rounded-xl border border-emerald-900/50 transition-colors"
-            >
-              <Download size={18} />
+            <button onClick={handleExportCSV} className="flex items-center space-x-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 px-4 py-2 rounded-lg border border-emerald-200 transition-colors text-sm font-semibold">
+              <Download size={16} />
               <span>Export CSV</span>
             </button>
-            <button
-              onClick={() => { fetchLogs(); fetchStats(); }}
-              className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl border border-slate-700 transition-colors shadow-lg shadow-slate-900/50"
-            >
-              <RefreshCw size={18} className={loading ? "animate-spin text-blue-400" : "text-blue-400"} />
+            <button onClick={() => { fetchLogs(); fetchStats(); }} className="flex items-center space-x-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 px-4 py-2 rounded-lg border border-slate-200 transition-colors text-sm font-semibold">
+              <RefreshCw size={16} className={loading ? "animate-spin text-blue-500" : "text-blue-500"} />
               <span>Refresh</span>
-            </button>
-            <button
-              onClick={() => navigate('/teacher')}
-              className="bg-slate-700 hover:bg-slate-600 text-white px-6 py-2 rounded-xl transition-colors font-semibold"
-            >
-              Back
             </button>
           </div>
         </div>
 
-        {/* Exam Stats Summary */}
+        {/* Stats */}
         {examStats && (
           <div className="grid grid-cols-4 gap-4 mb-6">
-            <div className="bg-slate-800 rounded-xl p-4 border border-slate-700 flex items-center space-x-3">
-              <BarChart3 size={20} className="text-cyan-400" />
-              <div>
-                <p className="text-xs text-slate-400 uppercase tracking-wider">Students</p>
-                <p className="text-xl font-bold text-white">{examStats.studentsJoined}</p>
+            {[
+              { label: 'Students', value: examStats.studentsJoined, icon: BarChart3, color: 'text-cyan-600', bg: 'bg-cyan-50' },
+              { label: 'Submissions', value: examStats.submissions, icon: BarChart3, color: 'text-blue-600', bg: 'bg-blue-50' },
+              { label: 'Violations', value: examStats.violations, icon: AlertCircle, color: 'text-orange-600', bg: 'bg-orange-50' },
+              { label: 'Flagged', value: examStats.flaggedStudents, icon: Flag, color: 'text-red-600', bg: 'bg-red-50' },
+            ].map((stat, i) => (
+              <div key={i} className="bg-white rounded-xl p-4 border border-slate-200 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] flex items-center space-x-3">
+                <div className={`w-10 h-10 ${stat.bg} rounded-lg flex items-center justify-center`}>
+                  <stat.icon size={18} className={stat.color} />
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black">{stat.label}</p>
+                  <p className="text-xl font-black text-slate-900">{stat.value}</p>
+                </div>
               </div>
-            </div>
-            <div className="bg-slate-800 rounded-xl p-4 border border-slate-700 flex items-center space-x-3">
-              <BarChart3 size={20} className="text-blue-400" />
-              <div>
-                <p className="text-xs text-slate-400 uppercase tracking-wider">Submissions</p>
-                <p className="text-xl font-bold text-white">{examStats.submissions}</p>
-              </div>
-            </div>
-            <div className="bg-slate-800 rounded-xl p-4 border border-slate-700 flex items-center space-x-3">
-              <AlertCircle size={20} className="text-orange-400" />
-              <div>
-                <p className="text-xs text-slate-400 uppercase tracking-wider">Violations</p>
-                <p className="text-xl font-bold text-white">{examStats.violations}</p>
-              </div>
-            </div>
-            <div className="bg-slate-800 rounded-xl p-4 border border-slate-700 flex items-center space-x-3">
-              <Flag size={20} className="text-red-400" />
-              <div>
-                <p className="text-xs text-slate-400 uppercase tracking-wider">Flagged</p>
-                <p className="text-xl font-bold text-white">{examStats.flaggedStudents}</p>
-              </div>
-            </div>
+            ))}
           </div>
         )}
 
-        <div className="flex space-x-6 border-b border-slate-800 mb-6">
+        {/* Tabs */}
+        <div className="flex space-x-1 bg-slate-50 rounded-lg p-1 border border-slate-100 mb-6 w-fit">
           <button
             onClick={() => setActiveTab('live')}
-            className={`pb-3 px-2 font-semibold transition-colors ${activeTab === 'live' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-slate-500 hover:text-slate-300'}`}
+            className={`px-5 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'live' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}
           >
             Live Monitoring
           </button>
           <button
             onClick={() => setActiveTab('logs')}
-            className={`pb-3 px-2 font-semibold transition-colors ${activeTab === 'logs' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-slate-500 hover:text-slate-300'}`}
+            className={`px-5 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'logs' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}
           >
             Violation Logs
           </button>
         </div>
 
         {activeTab === 'live' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {examStats && examStats.studentsList && examStats.studentsList.length > 0 ? (
               examStats.studentsList.map(student => {
-                let bgColor = 'bg-green-900/20 border-green-500/30 text-green-400';
-                let textColor = 'text-green-500';
-                let iconColor = 'text-green-400';
-
-                if (student.violation_count >= 10) {
-                  bgColor = 'bg-red-900/20 border-red-500/30 text-red-500';
-                  textColor = 'text-red-500';
-                  iconColor = 'text-red-400';
-                } else if (student.violation_count >= 5) {
-                  bgColor = 'bg-yellow-900/20 border-yellow-500/30 text-yellow-500';
-                  textColor = 'text-yellow-500';
-                  iconColor = 'text-yellow-400';
-                }
-
+                const status = getStudentStatusColor(student.violation_count);
                 return (
-                  <div key={student.student_id} className={`rounded-2xl p-6 border text-center flex flex-col items-center justify-center shadow-lg transition-all ${bgColor}`}>
-                    <div className="w-12 h-12 bg-slate-900/50 rounded-full flex items-center justify-center mb-4">
-                      <UserSearch size={24} className={iconColor} />
+                  <div key={student.student_id} className={`${status.bg} rounded-xl p-5 border ${status.border} text-center flex flex-col items-center shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] transition-all hover:shadow-md`}>
+                    <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mb-3 border border-slate-200 shadow-sm">
+                      <UserSearch size={22} className={status.text} />
                     </div>
-                    <h3 className="text-white font-bold text-lg mb-1 truncate w-full" title={student.name}>{student.name}</h3>
-                    <p className="text-xs opacity-70 mb-4 truncate w-full" title={student.email}>{student.email}</p>
-                    <div className="mt-auto">
-                      <span className="text-3xl font-black">{student.violation_count}</span>
-                      <p className="text-[10px] uppercase tracking-wider font-semibold mt-1">Violations</p>
+                    <h3 className="text-slate-900 font-bold text-sm mb-0.5 truncate w-full" title={student.name}>{student.name}</h3>
+                    <p className="text-xs text-slate-400 mb-3 truncate w-full" title={student.email}>{student.email}</p>
+                    <div className="mt-auto flex items-center space-x-1.5">
+                      <span className={`w-2 h-2 rounded-full ${status.dot}`}></span>
+                      <span className={`text-[10px] font-black uppercase tracking-widest ${status.text}`}>{status.label}</span>
                     </div>
+                    <span className={`text-2xl font-black mt-1 ${status.text}`}>{student.violation_count}</span>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Violations</p>
                   </div>
                 );
               })
             ) : (
-              <div className="col-span-full py-12 text-center text-slate-500 bg-slate-800/50 rounded-2xl border border-slate-700/50 border-dashed">
-                <p className="text-lg">No students have joined yet.</p>
+              <div className="col-span-full py-16 text-center text-slate-400 bg-slate-50 rounded-xl border border-slate-100 border-dashed">
+                <p className="text-lg font-medium">No students have joined yet.</p>
               </div>
             )}
           </div>
         ) : (
-          <div className="bg-slate-800 rounded-3xl overflow-hidden shadow-2xl border border-slate-700">
+          <div className="bg-white rounded-xl overflow-hidden border border-slate-200 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-900/50 text-slate-400 uppercase text-xs tracking-wider border-b border-slate-700">
-                    <th className="p-6 font-semibold">Timestamp</th>
-                    <th className="p-6 font-semibold">Student Name</th>
-                    <th className="p-6 font-semibold">Email</th>
-                    <th className="p-6 font-semibold">Suspicious Event</th>
-                    <th className="p-6 font-semibold">Severity</th>
+                  <tr className="bg-slate-50 text-slate-500 uppercase text-[10px] tracking-widest font-black border-b border-slate-200">
+                    <th className="p-4">Timestamp</th>
+                    <th className="p-4">Student Name</th>
+                    <th className="p-4">Email</th>
+                    <th className="p-4">Suspicious Event</th>
+                    <th className="p-4">Severity</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-700/50">
+                <tbody className="divide-y divide-slate-100">
                   {logs.length === 0 ? (
                     <tr>
-                      <td colSpan="5" className="p-12 text-center text-slate-500">
+                      <td colSpan="5" className="p-12 text-center text-slate-400">
                         <div className="flex flex-col items-center justify-center">
-                          <div className="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center mb-4 border border-slate-800">
-                            <ShieldAlert size={24} className="text-slate-700" />
+                          <div className="w-14 h-14 bg-slate-50 rounded-full flex items-center justify-center mb-3 border border-slate-100">
+                            <ShieldAlert size={22} className="text-slate-300" />
                           </div>
-                          <p className="text-lg font-medium">No suspicious activity detected yet.</p>
-                          <p className="text-sm">Logs will appear here in real-time.</p>
+                          <p className="text-base font-semibold text-slate-500">No suspicious activity detected yet.</p>
+                          <p className="text-sm text-slate-400">Logs will appear here in real-time.</p>
                         </div>
                       </td>
                     </tr>
                   ) : (
-                    logs.map(log => (
-                      <tr key={log.id} className="hover:bg-slate-800/80 transition-colors group">
-                        <td className="p-6 text-slate-400 whitespace-nowrap">
-                          <span className="bg-slate-900 px-3 py-1 rounded-lg border border-slate-800 font-mono text-sm">
+                    logs.map((log, i) => (
+                      <tr key={log.id} className={`hover:bg-blue-50/30 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+                        <td className="p-4 text-slate-500 whitespace-nowrap">
+                          <span className="bg-slate-50 px-2 py-1 rounded-md border border-slate-100 font-mono text-xs">
                             {new Date(log.timestamp).toLocaleString()}
                           </span>
                         </td>
-                        <td className="p-6 text-white font-medium">{log.student_name}</td>
-                        <td className="p-6 text-slate-400">{log.student_email}</td>
-                        <td className="p-6">
-                          <div className="inline-flex items-center space-x-2 bg-red-900/20 text-red-200 px-3 py-1.5 rounded-lg border border-red-900/50">
+                        <td className="p-4 text-slate-900 font-semibold text-sm">{log.student_name}</td>
+                        <td className="p-4 text-slate-500 text-sm">{log.student_email}</td>
+                        <td className="p-4">
+                          <div className="inline-flex items-center space-x-1.5 bg-red-50 text-red-700 px-2.5 py-1 rounded-md border border-red-100 text-xs font-semibold">
                             {getEventIcon(log.event_type)}
-                            <span className="font-medium text-sm">{log.event_type}</span>
+                            <span>{log.event_type}</span>
                           </div>
                         </td>
-                        <td className="p-6">
-                          <span className={`text-xs px-3 py-1.5 rounded-lg border font-medium capitalize ${getSeverityBadge(log.severity)}`}>
+                        <td className="p-4">
+                          <span className={`text-[10px] px-2.5 py-1 rounded-md border font-black uppercase tracking-widest ${getSeverityBadge(log.severity)}`}>
                             {log.severity || 'medium'}
                           </span>
                         </td>

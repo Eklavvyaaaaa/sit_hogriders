@@ -27,94 +27,116 @@ const StudentHistory = () => {
     }, []);
 
     const getScoreBadge = (score) => {
-        if (score === null || score === undefined) return 'bg-slate-700 text-slate-400';
-        if (score >= 80) return 'bg-green-900/30 text-green-400 border-green-900/50';
-        if (score >= 55) return 'bg-yellow-900/30 text-yellow-400 border-yellow-900/50';
-        return 'bg-red-900/30 text-red-400 border-red-900/50';
+        if (score === null || score === undefined) return { bg: 'bg-slate-50', text: 'text-slate-500', border: 'border-slate-200' };
+        if (score >= 80) return { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' };
+        if (score >= 55) return { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' };
+        return { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' };
     };
 
     return (
-        <div className="min-h-screen bg-slate-900 flex flex-col">
+        <div className="min-h-screen bg-white flex flex-col font-inter">
             <Navbar />
             <div className="flex-1 max-w-5xl w-full mx-auto p-8">
                 <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-white mb-2">Exam History</h1>
-                    <p className="text-slate-400">View your past exam results and detailed scores.</p>
+                    <p className="text-[11px] font-black text-blue-600 uppercase tracking-widest mb-1">Student Portal</p>
+                    <h1 className="text-3xl font-black text-slate-900 tracking-tighter mb-1">Exam History</h1>
+                    <p className="text-slate-500 text-sm font-medium">View your past exam results and detailed scores.</p>
                 </div>
 
                 {loading ? (
-                    <div className="text-center py-20 text-slate-400">Loading...</div>
+                    <div className="text-center py-20 text-slate-400 font-medium">Loading...</div>
                 ) : error ? (
-                    <div className="text-center py-20 text-red-400">Error: {error.message || 'Failed to fetch history'}</div>
+                    <div className="text-center py-20 text-red-500 font-medium">Error: {error.message || 'Failed to fetch history'}</div>
                 ) : history.length === 0 ? (
-                    <div className="text-center py-20 bg-slate-800/50 rounded-2xl border border-slate-700/50 border-dashed">
-                        <BookOpen size={48} className="mx-auto text-slate-600 mb-4" />
-                        <p className="text-slate-400 text-lg">No exams taken yet.</p>
+                    <div className="text-center py-20 bg-slate-50 rounded-xl border border-slate-100 border-dashed">
+                        <BookOpen size={48} className="mx-auto text-slate-300 mb-4" />
+                        <p className="text-slate-400 text-lg font-medium">No exams taken yet.</p>
                         <button
                             onClick={() => navigate('/join')}
-                            className="mt-4 text-blue-400 hover:text-blue-300 font-semibold"
+                            className="mt-4 text-blue-600 hover:text-blue-700 font-bold"
                         >
                             Join an exam →
                         </button>
                     </div>
                 ) : (
-                    <div className="space-y-4">
-                        {history.map((item) => (
-                            <div
-                                key={item.submission_id}
-                                onClick={() => navigate(`/results/${item.submission_id}`)}
-                                className="bg-slate-800 rounded-2xl p-6 border border-slate-700 hover:border-slate-500 cursor-pointer transition-all shadow-lg hover:shadow-xl group"
-                                role="button"
-                                tabIndex={0}
-                                aria-label={`View results for ${item.exam_title}`}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                        e.preventDefault();
-                                        navigate(`/results/${item.submission_id}`);
-                                    }
-                                }}
-                            >
-                                <div className="flex items-center justify-between">
-                                    <div className="flex-1">
-                                        <div className="flex items-center space-x-3 mb-2">
-                                            <h3 className="text-xl font-bold text-white">{item.exam_title}</h3>
-                                            <span className={`text-xs px-2 py-1 rounded-lg border font-medium capitalize ${item.status === 'submitted' ? 'bg-green-900/30 text-green-400 border-green-900/50' : 'bg-yellow-900/30 text-yellow-400 border-yellow-900/50'
-                                                }`}>
-                                                {item.status}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center space-x-6 text-sm text-slate-400">
-                                            <span className="flex items-center space-x-1">
-                                                <Clock size={14} />
-                                                <span>{item.submitted_at ? new Date(item.submitted_at).toLocaleDateString() : 'Not submitted'}</span>
-                                            </span>
-                                            <span className="flex items-center space-x-1">
-                                                <Timer size={14} />
-                                                <span>{item.duration} mins</span>
-                                            </span>
-                                            {item.violation_count > 0 && (
-                                                <span className="flex items-center space-x-1 text-orange-400">
-                                                    <AlertTriangle size={14} />
-                                                    <span>{item.violation_count} violations</span>
+                    <div className="bg-white rounded-xl overflow-hidden border border-slate-200 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]">
+                        <table className="w-full text-left">
+                            <thead>
+                                <tr className="bg-slate-50 text-slate-500 uppercase text-[10px] tracking-widest font-black border-b border-slate-200">
+                                    <th className="p-4">Exam</th>
+                                    <th className="p-4">Date</th>
+                                    <th className="p-4">Duration</th>
+                                    <th className="p-4">Violations</th>
+                                    <th className="p-4">Status</th>
+                                    <th className="p-4">Score</th>
+                                    <th className="p-4"></th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {history.map((item, i) => {
+                                    const scoreBadge = getScoreBadge(item.final_score);
+                                    return (
+                                        <tr
+                                            key={item.submission_id}
+                                            onClick={() => navigate(`/results/${item.submission_id}`)}
+                                            className={`hover:bg-blue-50/30 cursor-pointer transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}
+                                            role="button"
+                                            tabIndex={0}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                    e.preventDefault();
+                                                    navigate(`/results/${item.submission_id}`);
+                                                }
+                                            }}
+                                        >
+                                            <td className="p-4">
+                                                <span className="text-slate-900 font-semibold text-sm">{item.exam_title}</span>
+                                            </td>
+                                            <td className="p-4">
+                                                <span className="flex items-center space-x-1 text-slate-500 text-sm">
+                                                    <Clock size={13} className="text-slate-400" />
+                                                    <span>{item.submitted_at ? new Date(item.submitted_at).toLocaleDateString() : 'Not submitted'}</span>
                                                 </span>
-                                            )}
-                                            {item.flagged && (
-                                                <span className="text-xs bg-red-900/30 text-red-400 px-2 py-0.5 rounded border border-red-900/50">Flagged</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center space-x-4">
-                                        {item.final_score !== null && (
-                                            <div className={`text-center px-4 py-2 rounded-xl border ${getScoreBadge(item.final_score)}`}>
-                                                <div className="text-2xl font-bold">{Math.round(item.final_score)}</div>
-                                                <div className="text-xs opacity-70">Score</div>
-                                            </div>
-                                        )}
-                                        <ChevronRight size={20} className="text-slate-600 group-hover:text-slate-400 transition-colors" />
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
+                                            </td>
+                                            <td className="p-4">
+                                                <span className="flex items-center space-x-1 text-slate-500 text-sm">
+                                                    <Timer size={13} className="text-slate-400" />
+                                                    <span>{item.duration} mins</span>
+                                                </span>
+                                            </td>
+                                            <td className="p-4">
+                                                {item.violation_count > 0 ? (
+                                                    <span className="flex items-center space-x-1 text-orange-600 text-sm font-semibold">
+                                                        <AlertTriangle size={14} />
+                                                        <span>{item.violation_count}</span>
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-slate-400 text-sm">0</span>
+                                                )}
+                                            </td>
+                                            <td className="p-4">
+                                                <span className={`text-[10px] px-2 py-1 rounded-md border font-black uppercase tracking-widest ${item.status === 'submitted'
+                                                        ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                                                        : 'bg-amber-50 text-amber-600 border-amber-200'
+                                                    }`}>
+                                                    {item.status}
+                                                </span>
+                                            </td>
+                                            <td className="p-4">
+                                                {item.final_score !== null && (
+                                                    <span className={`inline-flex items-center justify-center min-w-[44px] px-2.5 py-1.5 rounded-lg border font-black text-base ${scoreBadge.bg} ${scoreBadge.border} ${scoreBadge.text}`}>
+                                                        {Math.round(item.final_score)}
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="p-4">
+                                                <ChevronRight size={16} className="text-slate-300" />
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
                     </div>
                 )}
             </div>
