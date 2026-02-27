@@ -77,6 +77,7 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
     const [integrityScore, setIntegrityScore] = useState(100);
     const [monitoringError, setMonitoringError] = useState(null);
     const [isReady, setIsReady] = useState(false);
+    const [isTerminated, setIsTerminated] = useState(false);
 
     // ── Refs (survives re-renders, prevents double-init) ──
     const faceLandmarkerRef = useRef(null);
@@ -88,6 +89,8 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
     const isLoopRunningRef = useRef(false);     // Lock: prevents duplicate detection loops
     const fatalErrorRef = useRef(false);        // Kill switch: stops loop after fatal crash
     const consecutiveErrorsRef = useRef(0);     // Tracks repeated detection failures
+    const isTerminatedRef = useRef(false);
+    const alertsRef = useRef([]);
 
     // Keep callback ref in sync without triggering re-renders
     useEffect(() => {
@@ -146,14 +149,53 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
     }, []); // Empty deps — runs exactly once
 
     // ══════════════════════════════════════════════════════
-    // 2. THROTTLED EVENT LOGGER
+    // 2. THROTTLED EVENT LOGGER & TERMINATION
     // ══════════════════════════════════════════════════════
+    const stopMonitoring = useCallback(() => {
+        log('Stop', 'stopMonitoring called');
+        setIsMonitoring(false);
+
+        // Stop detection loop
+        isLoopRunningRef.current = false;
+        if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
+            animationFrameRef.current = null;
+        }
+
+        // Release camera
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach(track => track.stop());
+            streamRef.current = null;
+        }
+    }, []);
+
     const sendLog = useCallback(async (eventType, confidence = 1.0) => {
+        if (isTerminatedRef.current) return;
+
         const now = Date.now();
         if (now - lastLogTime.current < 5000) return;
 
         lastLogTime.current = now;
-        setAlerts(prev => [...prev, { time: new Date(), type: eventType, confidence }]);
+
+        const newAlert = { time: new Date(), type: eventType, confidence };
+        const updatedAlerts = [...alertsRef.current, newAlert];
+
+        // Optimistically update ref to prevent race conditions before component re-renders
+        alertsRef.current = updatedAlerts;
+        setAlerts(updatedAlerts);
+
+        if (updatedAlerts.length >= 10 && !isTerminatedRef.current) {
+            isTerminatedRef.current = true;
+            setIsTerminated(true);
+            stopMonitoring();
+            api.post('/monitor/terminate', { examId })
+                .then(() => {
+                    window.location.href = `/last-chance?examId=${examId}`;
+                })
+                .catch(e => err('Terminate', 'API Error:', e.message));
+        }
+
+        if (isTerminatedRef.current) return;
 
         setIntegrityScore(prev => {
             let deduction = 0;
@@ -169,7 +211,7 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
         } catch (e) {
             err('Log', 'Failed to send log to API:', e.message);
         }
-    }, [examId]);
+    }, [examId, stopMonitoring]);
 
     // ══════════════════════════════════════════════════════
     // 3. DETECTION LOOP (RAF-based, crash-proof)
@@ -365,6 +407,10 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
 
         try {
             const stream = existingStream || await navigator.mediaDevices.getUserMedia({ video: true });
+            if (isTerminatedRef.current) {
+                stream.getTracks().forEach(track => track.stop());
+                return;
+            }
             videoElement.srcObject = stream;
             streamRef.current = stream;
             log('Camera', 'Camera stream started ✓');
@@ -385,30 +431,13 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
         }
     }, [sendLog]);
 
-    const stopMonitoring = useCallback(() => {
-        log('Stop', 'stopMonitoring called');
-        setIsMonitoring(false);
-
-        // Stop detection loop
-        isLoopRunningRef.current = false;
-        if (animationFrameRef.current) {
-            cancelAnimationFrame(animationFrameRef.current);
-            animationFrameRef.current = null;
-        }
-
-        // Release camera
-        if (streamRef.current) {
-            streamRef.current.getTracks().forEach(track => track.stop());
-            streamRef.current = null;
-        }
-    }, []);
-
     return {
         startMonitoring,
         stopMonitoring,
         alerts,
         integrityScore,
         isReady,
-        monitoringError
+        monitoringError,
+        isTerminated
     };
 };

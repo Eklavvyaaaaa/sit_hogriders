@@ -125,3 +125,107 @@ exports.getLogs = async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 };
+
+exports.terminateSession = async (req, res) => {
+    try {
+        const { examId } = req.body;
+        const studentId = req.user.id;
+
+        if (!examId) {
+            return res.status(400).json({ message: 'Exam ID is required for termination.' });
+        }
+
+        const result = await query(`
+            UPDATE students_exam 
+            SET terminated = true, terminated_at = CURRENT_TIMESTAMP
+            WHERE student_id = $1 AND exam_id = $2
+            RETURNING *
+        `, [studentId, examId]);
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ message: 'Student exam session not found.' });
+        }
+
+        const io = getIO();
+        if (io) {
+            io.to(`exam:${examId}`).emit('student:terminated', {
+                studentId,
+                examId,
+                timestamp: new Date().toISOString()
+            });
+        }
+
+        res.json({ message: 'Session terminated successfully due to excessive alerts.' });
+    } catch (error) {
+        console.error('Terminate session error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+exports.requestLastChance = async (req, res) => {
+    try {
+        const { examId } = req.body;
+        const studentId = req.user.id;
+
+        if (!examId) {
+            return res.status(400).json({ message: 'Exam ID is required.' });
+        }
+
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            const checkResult = await client.query(`
+                SELECT last_chance_used, terminated FROM students_exam 
+                WHERE student_id = $1 AND exam_id = $2
+                FOR UPDATE
+            `, [studentId, examId]);
+
+            if (checkResult.rowCount === 0) {
+                await client.query('ROLLBACK');
+                return res.status(404).json({ message: 'Session not found.' });
+            }
+
+            if (checkResult.rows[0].last_chance_used) {
+                await client.query('ROLLBACK');
+                return res.status(403).json({ message: 'Last chance attempt already used. Exam is permanently locked.' });
+            }
+
+            if (!checkResult.rows[0].terminated) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ message: 'Session is not terminated yet.' });
+            }
+
+            // Wipe logs so they start fresh
+            await client.query(`
+                DELETE FROM monitoring_logs 
+                WHERE user_id = $1 AND exam_id = $2
+            `, [studentId, examId]);
+
+            // Reset violations safely and unsubmit
+            await client.query(`
+                UPDATE students_exam 
+                SET terminated = false, violation_count = 0, last_chance_used = true, submitted = false, flagged = false
+                WHERE student_id = $1 AND exam_id = $2
+            `, [studentId, examId]);
+
+            // Reconcile submissions table if it was auto-submitted
+            await client.query(`
+                UPDATE submissions
+                SET status = 'in_progress', submitted_at = NULL
+                WHERE student_id = $1 AND exam_id = $2 AND status = 'submitted'
+            `, [studentId, examId]);
+
+            await client.query('COMMIT');
+            res.json({ message: 'Last chance granted. Warnings resetted to 0.' });
+        } catch (err) {
+            await client.query('ROLLBACK');
+            throw err;
+        } finally {
+            client.release();
+        }
+    } catch (error) {
+        console.error('Last chance error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
