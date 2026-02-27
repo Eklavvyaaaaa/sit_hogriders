@@ -1,3 +1,4 @@
+import os
 from flask import Flask, request, jsonify
 from content_module import calculate_cis
 from pattern_module import calculate_pcs
@@ -100,4 +101,17 @@ def evaluate_ati():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000, debug=True)
+    # Derive configuration from environment variables
+    host = os.environ.get("HOST", "127.0.0.1")
+    port = int(os.environ.get("PORT", 8000))
+    
+    # Validate DEBUG environment variable
+    debug_env = os.environ.get("DEBUG", "False").lower()
+    debug_mode = debug_env in ("true", "1", "t", "yes")
+
+    # Security safeguard: Ensure debug is False in production environments
+    flask_env = os.environ.get("FLASK_ENV", "").lower()
+    if flask_env == "production":
+        debug_mode = False
+
+    app.run(host=host, port=port, debug=debug_mode)

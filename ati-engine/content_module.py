@@ -3,8 +3,25 @@ from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 import re
 
+import logging
+import sys
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Load model once at startup
-model = SentenceTransformer("all-MiniLM-L6-v2", local_files_only=True)
+try:
+    model = SentenceTransformer("all-MiniLM-L6-v2", local_files_only=True)
+except Exception as e:
+    logger.error(
+        "CRITICAL ERROR: Failed to load the SentenceTransformer model 'all-MiniLM-L6-v2'. "
+        "The model must be pre-downloaded and cached locally because 'local_files_only=True' is set. "
+        "To download the model, run the following command in your terminal:\n"
+        "python3 -c \"from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')\""
+    )
+    # Re-raise to prevent the engine from starting in a broken state
+    raise RuntimeError("SentenceTransformer model 'all-MiniLM-L6-v2' is not pre-cached locally. See logs for download instructions.") from e
 
 
 def preprocess_text(text):
