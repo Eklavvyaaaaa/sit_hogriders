@@ -272,14 +272,20 @@ const TeacherDashboard = () => {
                                                 <span className="bg-slate-900 px-2 py-1 rounded">Duration: {exam.duration} mins</span>
                                                 <span className="bg-slate-900 px-2 py-1 rounded">ID: {exam.id}</span>
                                                 {exam.exam_code && (
-                                                    <span
-                                                        className="bg-blue-900/30 text-blue-400 border border-blue-900/50 px-2 py-1 rounded font-mono cursor-pointer hover:bg-blue-900/50 transition-colors flex items-center space-x-1"
-                                                        onClick={() => { navigator.clipboard.writeText(exam.exam_code); alert('Exam code copied!'); }}
+                                                    <button
+                                                        type="button"
+                                                        aria-label="Copy exam code"
+                                                        className="bg-blue-900/30 text-blue-400 border border-blue-900/50 px-2 py-1 rounded font-mono cursor-pointer hover:bg-blue-900/50 transition-colors flex items-center space-x-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        onClick={() => {
+                                                            navigator.clipboard.writeText(exam.exam_code)
+                                                                .then(() => alert('Exam code copied!'))
+                                                                .catch(err => console.error('Failed to copy text: ', err));
+                                                        }}
                                                         title="Click to copy exam code"
                                                     >
                                                         <Copy size={12} />
                                                         <span>Code: {exam.exam_code}</span>
-                                                    </span>
+                                                    </button>
                                                 )}
                                             </div>
                                         </div>
