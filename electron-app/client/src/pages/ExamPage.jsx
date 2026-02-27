@@ -15,6 +15,7 @@ const ExamPage = () => {
     const classroomCode = location.state?.classroomCode;
 
     const [answers, setAnswers] = useState({});
+    const [textAnswers, setTextAnswers] = useState({});
     const [isSubmitted, setIsSubmitted] = useState(false);
     const [hasStarted, setHasStarted] = useState(false);
     const [violationCount, setViolationCount] = useState(0);
@@ -28,7 +29,6 @@ const ExamPage = () => {
             return;
         }
 
-        // Pre-fetch camera stream to prevent reset during lock
         navigator.mediaDevices.getUserMedia({ video: true })
             .then(stream => {
                 streamRef.current = stream;
@@ -37,7 +37,6 @@ const ExamPage = () => {
                 console.error("Camera pre-fetch failed:", err);
             });
 
-        // Cleanup on unmount
         return () => {
             if (removeFocusListenerRef.current) {
                 removeFocusListenerRef.current();
@@ -57,7 +56,6 @@ const ExamPage = () => {
         if (window.electronAPI) {
             window.electronAPI.activateLock();
 
-            // Start monitoring focus loss
             removeFocusListenerRef.current = window.electronAPI.onFocusLost(() => {
                 if (ignoreNextBlur.current) {
                     ignoreNextBlur.current = false;
@@ -66,7 +64,6 @@ const ExamPage = () => {
                 logViolation('Window Focus Lost');
             });
 
-            // Just in case blur doesn't fire immediately, reset ignore flag after a short delay
             setTimeout(() => {
                 ignoreNextBlur.current = false;
             }, 2000);
@@ -78,7 +75,8 @@ const ExamPage = () => {
             setViolationCount(prev => prev + 1);
             await api.post('/monitor/log', {
                 examId: examData.examId,
-                type: type,
+                eventType: type,
+                severity: 'medium',
                 timestamp: new Date().toISOString()
             });
             console.warn(`Violation Logged: ${type}`);
@@ -91,22 +89,49 @@ const ExamPage = () => {
         setAnswers(prev => ({ ...prev, [qIndex]: oIndex }));
     };
 
+    const handleTextAnswer = (qIndex, text) => {
+        setTextAnswers(prev => ({ ...prev, [qIndex]: text }));
+    };
+
     const calculateScore = () => {
         let score = 0;
         examData.questions.forEach((q, index) => {
-            if (answers[index] === q.correctOption) {
+            if (q.type !== 'subjective' && answers[index] === q.correctOption) {
                 score += 1;
             }
         });
         return score;
     };
 
+    const getAnsweredCount = () => {
+        let count = 0;
+        examData.questions.forEach((q, index) => {
+            if (q.type === 'subjective') {
+                if (textAnswers[index] && textAnswers[index].trim()) count++;
+            } else {
+                if (answers[index] !== undefined) count++;
+            }
+        });
+        return count;
+    };
+
     const handleSubmit = async () => {
         try {
             const score = calculateScore();
+
+            // Build combined answers object with both MCQ choices and text answers
+            const combinedAnswers = {};
+            examData.questions.forEach((q, index) => {
+                if (q.type === 'subjective') {
+                    combinedAnswers[index] = { type: 'subjective', text: textAnswers[index] || '' };
+                } else {
+                    combinedAnswers[index] = { type: 'mcq', selected: answers[index] };
+                }
+            });
+
             await api.post('/exam/submit', {
                 examId: examData.examId,
-                answers,
+                answers: combinedAnswers,
                 score
             });
             setIsSubmitted(true);
@@ -210,6 +235,8 @@ const ExamPage = () => {
                                 index={index}
                                 selectedOption={answers[index]}
                                 onSelectOption={handleSelectOption}
+                                textAnswer={textAnswers[index]}
+                                onTextAnswer={handleTextAnswer}
                             />
                         ))}
                     </div>
@@ -218,7 +245,7 @@ const ExamPage = () => {
                 <div className="absolute bottom-0 left-0 right-0 bg-slate-800/95 backdrop-blur border-t border-slate-700 p-4 shrink-0 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
                     <div className="max-w-3xl mx-auto flex justify-between items-center">
                         <div className="text-slate-400 text-sm">
-                            Answered: <span className="text-white font-bold">{Object.keys(answers).length}</span> / {examData.questions.length} | Violations: <span className="text-red-400">{violationCount}</span>
+                            Answered: <span className="text-white font-bold">{getAnsweredCount()}</span> / {examData.questions.length} | Violations: <span className="text-red-400">{violationCount}</span>
                         </div>
                         <button
                             onClick={() => {

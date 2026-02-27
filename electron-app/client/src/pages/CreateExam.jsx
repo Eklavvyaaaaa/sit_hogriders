@@ -2,20 +2,37 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import api from '../services/api';
-import { Plus, Trash2, Save, Users } from 'lucide-react';
+import { Plus, Trash2, Save, Users, ToggleLeft, ToggleRight } from 'lucide-react';
 
 const CreateExam = () => {
     const [title, setTitle] = useState('');
     const [duration, setDuration] = useState(60);
     const [questions, setQuestions] = useState([
-        { text: '', options: ['', '', '', ''], correctOption: 0 }
+        { text: '', type: 'mcq', options: ['', '', '', ''], correctOption: 0, model_answer: '', key_points: [''] }
     ]);
     const [classroomCode, setClassroomCode] = useState(null);
 
     const navigate = useNavigate();
 
-    const addQuestion = () => {
-        setQuestions([...questions, { text: '', options: ['', '', '', ''], correctOption: 0 }]);
+    const addQuestion = (type = 'mcq') => {
+        if (type === 'subjective') {
+            setQuestions([...questions, { text: '', type: 'subjective', model_answer: '', key_points: [''] }]);
+        } else {
+            setQuestions([...questions, { text: '', type: 'mcq', options: ['', '', '', ''], correctOption: 0, model_answer: '', key_points: [''] }]);
+        }
+    };
+
+    const toggleQuestionType = (index) => {
+        const updated = [...questions];
+        const q = updated[index];
+        if (q.type === 'mcq') {
+            q.type = 'subjective';
+        } else {
+            q.type = 'mcq';
+            if (!q.options) q.options = ['', '', '', ''];
+            if (q.correctOption === undefined) q.correctOption = 0;
+        }
+        setQuestions(updated);
     };
 
     const updateQuestion = (index, field, value) => {
@@ -30,20 +47,46 @@ const CreateExam = () => {
         setQuestions(updated);
     };
 
+    const updateKeyPoint = (qIndex, kpIndex, value) => {
+        const updated = [...questions];
+        updated[qIndex].key_points[kpIndex] = value;
+        setQuestions(updated);
+    };
+
+    const addKeyPoint = (qIndex) => {
+        const updated = [...questions];
+        updated[qIndex].key_points.push('');
+        setQuestions(updated);
+    };
+
+    const removeKeyPoint = (qIndex, kpIndex) => {
+        const updated = [...questions];
+        updated[qIndex].key_points = updated[qIndex].key_points.filter((_, i) => i !== kpIndex);
+        setQuestions(updated);
+    };
+
     const removeQuestion = (index) => {
         setQuestions(questions.filter((_, i) => i !== index));
     };
 
+    const isFormValid = () => {
+        if (!title) return false;
+        return questions.every(q => {
+            if (!q.text) return false;
+            if (q.type === 'mcq') {
+                return q.options && q.options.every(o => o.trim() !== '');
+            } else {
+                return q.model_answer && q.model_answer.trim() !== '';
+            }
+        });
+    };
+
     const handleSave = async () => {
         try {
-            // 1. Create Exam
             const examRes = await api.post('/exam/create', { title, duration, questions });
             const examId = examRes.data.examId;
-
-            // 2. Generate Classroom
             const classRes = await api.post('/classroom/generate', { examId });
             setClassroomCode(classRes.data.code);
-
         } catch (err) {
             console.error(err);
             alert('Failed to create exam');
@@ -80,7 +123,7 @@ const CreateExam = () => {
                     <>
                         <div className="mb-8">
                             <h1 className="text-3xl font-bold text-white mb-2">Create New Exam</h1>
-                            <p className="text-slate-400">Configure exam details and add questions.</p>
+                            <p className="text-slate-400">Configure exam details and add questions. Supports both MCQ and subjective questions.</p>
                         </div>
 
                         <div className="bg-slate-800 rounded-2xl p-6 shadow-xl border border-slate-700 mb-8 space-y-6">
@@ -109,7 +152,19 @@ const CreateExam = () => {
                             {questions.map((q, qIndex) => (
                                 <div key={qIndex} className="bg-slate-800 rounded-2xl p-6 shadow-xl border border-slate-700 relative">
                                     <div className="flex justify-between items-start mb-4">
-                                        <h3 className="text-lg font-semibold text-slate-300">Question {qIndex + 1}</h3>
+                                        <div className="flex items-center space-x-3">
+                                            <h3 className="text-lg font-semibold text-slate-300">Question {qIndex + 1}</h3>
+                                            <button
+                                                onClick={() => toggleQuestionType(qIndex)}
+                                                className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors border ${q.type === 'subjective'
+                                                        ? 'bg-purple-900/30 text-purple-400 border-purple-900/50'
+                                                        : 'bg-blue-900/30 text-blue-400 border-blue-900/50'
+                                                    }`}
+                                            >
+                                                {q.type === 'subjective' ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
+                                                <span>{q.type === 'subjective' ? 'Subjective' : 'MCQ'}</span>
+                                            </button>
+                                        </div>
                                         {questions.length > 1 && (
                                             <button onClick={() => removeQuestion(qIndex)} className="text-red-400 hover:text-red-300 p-2">
                                                 <Trash2 size={18} />
@@ -124,42 +179,99 @@ const CreateExam = () => {
                                         onChange={e => updateQuestion(qIndex, 'text', e.target.value)}
                                     />
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {q.options.map((opt, oIndex) => (
-                                            <div key={oIndex} className="flex items-center space-x-3">
-                                                <input
-                                                    type="radio"
-                                                    name={`correct-${qIndex}`}
-                                                    checked={q.correctOption === oIndex}
-                                                    onChange={() => updateQuestion(qIndex, 'correctOption', oIndex)}
-                                                    className="w-4 h-4 text-blue-500 bg-slate-900 border-slate-600 focus:ring-blue-500"
-                                                />
-                                                <input
-                                                    type="text"
-                                                    className="flex-1 p-2 bg-slate-900 border border-slate-700 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-white text-sm"
-                                                    placeholder={`Option ${oIndex + 1}`}
-                                                    value={opt}
-                                                    onChange={e => updateQuestionOption(qIndex, oIndex, e.target.value)}
+                                    {q.type === 'mcq' ? (
+                                        /* MCQ Options */
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {q.options.map((opt, oIndex) => (
+                                                <div key={oIndex} className="flex items-center space-x-3">
+                                                    <input
+                                                        type="radio"
+                                                        name={`correct-${qIndex}`}
+                                                        checked={q.correctOption === oIndex}
+                                                        onChange={() => updateQuestion(qIndex, 'correctOption', oIndex)}
+                                                        className="w-4 h-4 text-blue-500 bg-slate-900 border-slate-600 focus:ring-blue-500"
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        className="flex-1 p-2 bg-slate-900 border border-slate-700 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-white text-sm"
+                                                        placeholder={`Option ${oIndex + 1}`}
+                                                        value={opt}
+                                                        onChange={e => updateQuestionOption(qIndex, oIndex, e.target.value)}
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        /* Subjective: Model Answer + Key Points */
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="block text-slate-400 text-xs font-semibold mb-2 uppercase tracking-wider">Model Answer</label>
+                                                <textarea
+                                                    className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl focus:border-purple-500 focus:ring-1 focus:ring-purple-500 text-white min-h-[80px]"
+                                                    placeholder="Enter the ideal/expected answer..."
+                                                    value={q.model_answer}
+                                                    onChange={e => updateQuestion(qIndex, 'model_answer', e.target.value)}
                                                 />
                                             </div>
-                                        ))}
-                                    </div>
+                                            <div>
+                                                <label className="block text-slate-400 text-xs font-semibold mb-2 uppercase tracking-wider">Key Points</label>
+                                                <div className="space-y-2">
+                                                    {q.key_points.map((kp, kpIndex) => (
+                                                        <div key={kpIndex} className="flex items-center space-x-2">
+                                                            <span className="text-purple-400 text-xs font-mono w-6">{kpIndex + 1}.</span>
+                                                            <input
+                                                                type="text"
+                                                                className="flex-1 p-2 bg-slate-900 border border-slate-700 rounded-lg focus:border-purple-500 focus:ring-1 focus:ring-purple-500 text-white text-sm"
+                                                                placeholder={`Key point ${kpIndex + 1}`}
+                                                                value={kp}
+                                                                onChange={e => updateKeyPoint(qIndex, kpIndex, e.target.value)}
+                                                            />
+                                                            {q.key_points.length > 1 && (
+                                                                <button
+                                                                    onClick={() => removeKeyPoint(qIndex, kpIndex)}
+                                                                    className="text-red-400 hover:text-red-300 p-1"
+                                                                >
+                                                                    <Trash2 size={14} />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                    <button
+                                                        onClick={() => addKeyPoint(qIndex)}
+                                                        className="text-purple-400 hover:text-purple-300 text-xs font-medium flex items-center space-x-1 mt-1"
+                                                    >
+                                                        <Plus size={12} />
+                                                        <span>Add Key Point</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
 
                         <div className="mt-8 flex justify-between">
-                            <button
-                                onClick={addQuestion}
-                                className="flex items-center space-x-2 bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-xl font-semibold transition-colors"
-                            >
-                                <Plus size={18} />
-                                <span>Add Question</span>
-                            </button>
+                            <div className="flex space-x-3">
+                                <button
+                                    onClick={() => addQuestion('mcq')}
+                                    className="flex items-center space-x-2 bg-slate-700 hover:bg-slate-600 text-white px-5 py-3 rounded-xl font-semibold transition-colors"
+                                >
+                                    <Plus size={18} />
+                                    <span>Add MCQ</span>
+                                </button>
+                                <button
+                                    onClick={() => addQuestion('subjective')}
+                                    className="flex items-center space-x-2 bg-purple-900/40 hover:bg-purple-900/60 text-purple-300 px-5 py-3 rounded-xl font-semibold transition-colors border border-purple-900/50"
+                                >
+                                    <Plus size={18} />
+                                    <span>Add Subjective</span>
+                                </button>
+                            </div>
 
                             <button
                                 onClick={handleSave}
-                                disabled={!title || questions.some(q => !q.text || q.options.some(o => !o))}
+                                disabled={!isFormValid()}
                                 className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600 disabled:cursor-not-allowed text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-blue-600/20 transition-all"
                             >
                                 <Save size={18} />
