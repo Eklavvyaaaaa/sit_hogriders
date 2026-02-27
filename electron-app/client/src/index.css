@@ -154,6 +154,39 @@ body {
   opacity: 0;
 }
 
+@keyframes antigravity-logo {
+
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+    filter: brightness(1);
+  }
+
+  20% {
+    transform: translateY(0) scale(1.03);
+    filter: brightness(1.05);
+  }
+
+  50% {
+    transform: translateY(-8px) scale(1.03);
+    filter: brightness(1.1);
+  }
+
+  60% {
+    transform: translateY(-10px) scale(1.03);
+    filter: brightness(1.15) drop-shadow(0 10px 15px rgba(37, 99, 235, 0.2));
+  }
+
+  75% {
+    transform: translateY(-8px) scale(1.03);
+    filter: brightness(1.1);
+  }
+}
+
+.animate-antigravity {
+  animation: antigravity-logo 4s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
 
   .animate-badge,

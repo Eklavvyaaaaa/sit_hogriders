@@ -1,24 +1,39 @@
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import api from '../services/api';
-import { AuthContext } from '../context/AuthContext';
-import { ArrowLeft, Award, Brain, Shield, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
+import { ArrowLeft, Shield, AlertTriangle, ChevronRight } from 'lucide-react';
 
 const SubmissionResults = () => {
     const { submissionId } = useParams();
     const navigate = useNavigate();
-    const { user } = useContext(AuthContext);
-    const [data, setData] = useState(null);
+    const [detail, setDetail] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchDetail = async () => {
             try {
-                const res = await api.get(`/history/submission/${submissionId}`);
-                setData(res.data);
+                // Mock data for demo
+                const mockDetail = {
+                    exam_title: 'Algorithms Quiz',
+                    subject: 'Computer Science',
+                    date: 'Feb 10, 2026',
+                    score: 92,
+                    ati: 98,
+                    correct: 18,
+                    incorrect: 2,
+                    timeTaken: '45 mins',
+                    percentile: 95,
+                    behavioralMetrics: [
+                        { label: 'Typing Consistency', score: 96 },
+                        { label: 'Response Latency', score: 94 },
+                        { label: 'Revision Pattern', score: 91 },
+                        { label: 'Language Consistency', score: 98 },
+                        { label: 'Focus Stability', score: 89 }
+                    ]
+                };
+                setDetail(mockDetail);
             } catch (err) {
-                console.error('Failed to fetch submission', err);
+                console.error('Failed to fetch detail', err);
             } finally {
                 setLoading(false);
             }
@@ -26,158 +41,124 @@ const SubmissionResults = () => {
         fetchDetail();
     }, [submissionId]);
 
-    if (loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">Loading...</div>;
-    if (!data) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-red-400">Submission not found</div>;
-
-    const { submission, student, exam, questions, answers, finalGrade } = data;
-
     const getScoreColor = (score) => {
-        if (score === null || score === undefined) return 'text-slate-400';
-        const normalizedScore = score > 1 ? score / 100 : score;
-        if (normalizedScore >= 0.8) return 'text-green-400';
-        if (normalizedScore >= 0.55) return 'text-yellow-400';
-        return 'text-red-400';
+        if (score >= 85) return 'text-emerald-600 bg-emerald-50 border-emerald-100';
+        if (score >= 60) return 'text-orange-600 bg-orange-50 border-orange-100';
+        return 'text-red-600 bg-red-50 border-red-100';
     };
 
+    if (loading) return <div className="h-screen bg-[#f0f7ff] flex items-center justify-center font-bold text-slate-400">Loading results...</div>;
+    if (!detail) return <div className="h-screen bg-[#f0f7ff] flex items-center justify-center font-bold text-slate-400 text-center p-8">Results not found or not yet graded.</div>;
+
     return (
-        <div className="min-h-screen bg-slate-900 flex flex-col">
+        <div className="min-h-screen bg-[#f0f7ff] font-inter">
             <Navbar />
-            <div className="flex-1 max-w-5xl w-full mx-auto p-8">
+
+            <main className="max-w-5xl mx-auto px-8 py-12">
                 <button
-                    onClick={() => navigate(user.role === 'teacher' ? '/teacher' : '/history')}
-                    className="flex items-center space-x-2 text-slate-400 hover:text-white mb-6 transition-colors"
+                    onClick={() => navigate('/history')}
+                    className="flex items-center gap-2 text-slate-400 font-bold text-sm hover:text-slate-600 mb-10 transition-colors"
                 >
-                    <ArrowLeft size={18} />
-                    <span>Back</span>
+                    <ArrowLeft size={16} /> Back to History
                 </button>
 
-                {/* Header */}
-                <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700 mb-6">
-                    <div className="flex items-center justify-between">
+                {/* Header Card */}
+                <div className="bg-white rounded-3xl p-10 shadow-sm border border-white mb-8">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
                         <div>
-                            <h1 className="text-2xl font-bold text-white mb-1">{exam.title}</h1>
-                            <p className="text-slate-400 text-sm">
-                                Student: <span className="text-white">{student.name}</span> ({student.email})
-                            </p>
-                            <p className="text-slate-400 text-sm">
-                                Submitted: {submission.submitted_at ? new Date(submission.submitted_at).toLocaleString() : 'Not submitted'}
-                            </p>
+                            <span className="text-[11px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-full mb-4 inline-block">
+                                {detail.subject}
+                            </span>
+                            <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-tight">{detail.exam_title}</h1>
+                            <p className="text-slate-400 font-medium mt-1">Completed on {detail.date}</p>
                         </div>
-                        {finalGrade && (
+
+                        <div className="flex items-center gap-6">
                             <div className="text-center">
-                                <div className={`text-4xl font-bold ${getScoreColor(finalGrade.final_score)}`}>
-                                    {Math.round(finalGrade.final_score)}
-                                </div>
-                                <div className="text-xs text-slate-400 mt-1">Final Score</div>
-                                <div className="flex items-center space-x-3 mt-2 text-xs text-slate-500">
-                                    <span>Base: {Math.round(finalGrade.base_score)}</span>
-                                    <span>Trust: {finalGrade.trust_factor}x</span>
+                                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Final Score</p>
+                                <p className="text-6xl font-black text-slate-900 tracking-tighter">{detail.score}<span className="text-3xl text-slate-300 ml-1">%</span></p>
+                            </div>
+                            <div className="h-16 w-px bg-slate-100 mx-2"></div>
+                            <div className="text-center">
+                                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Integrity</p>
+                                <div className={`px-4 py-2 rounded-2xl border text-lg font-black ${getScoreColor(detail.ati)}`}>
+                                    {detail.ati}%
                                 </div>
                             </div>
-                        )}
+                        </div>
                     </div>
                 </div>
 
-                {/* Score Overview Cards */}
-                {finalGrade && (
-                    <div className="grid grid-cols-3 gap-4 mb-6">
-                        <div className="bg-slate-800 rounded-xl p-4 border border-slate-700 text-center">
-                            <Award size={24} className="mx-auto text-blue-400 mb-2" />
-                            <p className="text-2xl font-bold text-white">{Math.round(finalGrade.base_score)}</p>
-                            <p className="text-xs text-slate-400">Base Score</p>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Performance Summary */}
+                    <div className="bg-white rounded-3xl p-8 shadow-sm border border-white">
+                        <h3 className="text-xl font-black text-slate-900 tracking-tight mb-8">Performance Summary</h3>
+                        <div className="grid grid-cols-2 gap-6">
+                            <div className="bg-slate-50 p-6 rounded-2xl">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Correct Answers</p>
+                                <p className="text-3xl font-black text-emerald-600">{detail.correct}</p>
+                            </div>
+                            <div className="bg-slate-50 p-6 rounded-2xl">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Incorrect</p>
+                                <p className="text-3xl font-black text-red-600">{detail.incorrect}</p>
+                            </div>
+                            <div className="bg-slate-50 p-6 rounded-2xl">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Time Taken</p>
+                                <p className="text-2xl font-black text-slate-900">{detail.timeTaken}</p>
+                            </div>
+                            <div className="bg-slate-50 p-6 rounded-2xl">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Percentile</p>
+                                <p className="text-2xl font-black text-blue-600">{detail.percentile}th</p>
+                            </div>
                         </div>
-                        <div className="bg-slate-800 rounded-xl p-4 border border-slate-700 text-center">
-                            <Shield size={24} className="mx-auto text-cyan-400 mb-2" />
-                            <p className="text-2xl font-bold text-white">{finalGrade.trust_factor}x</p>
-                            <p className="text-xs text-slate-400">Trust Factor</p>
+
+                        <button
+                            onClick={() => navigate(`/review/${submissionId}`)}
+                            className="w-full mt-10 bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl shadow-lg shadow-blue-100 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                        >
+                            Review Detailed Answers <ChevronRight size={20} />
+                        </button>
+                    </div>
+
+                    {/* Behavioral Integrity Breakdown */}
+                    <div className="bg-white rounded-3xl p-8 shadow-sm border border-white">
+                        <div className="flex items-center gap-3 mb-8">
+                            <Shield className="text-blue-600" size={24} />
+                            <h3 className="text-xl font-black text-slate-900 tracking-tight">Behavioral Integrity</h3>
                         </div>
-                        <div className="bg-slate-800 rounded-xl p-4 border border-slate-700 text-center">
-                            <Brain size={24} className="mx-auto text-purple-400 mb-2" />
-                            <p className={`text-2xl font-bold ${getScoreColor(finalGrade.final_score)}`}>{Math.round(finalGrade.final_score)}</p>
-                            <p className="text-xs text-slate-400">Final Score</p>
+
+                        <div className="space-y-6">
+                            {detail.behavioralMetrics.map((metric, i) => (
+                                <div key={i}>
+                                    <div className="flex justify-between items-center mb-2">
+                                        <p className="text-sm font-bold text-slate-600">{metric.label}</p>
+                                        <p className="text-sm font-black text-slate-800">{metric.score}%</p>
+                                    </div>
+                                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-blue-600 rounded-full transition-all duration-1000"
+                                            style={{ width: `${metric.score}%` }}
+                                        ></div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="mt-10 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
+                            <p className="text-[10px] font-black text-blue-800 uppercase tracking-widest mb-1 leading-none flex items-center gap-1">
+                                <AlertTriangle size={12} /> ATI Integrity Note
+                            </p>
+                            <p className="text-xs text-blue-700 leading-relaxed font-medium">
+                                Scores above 85% indicate high identity verification and typing biometric consistency during the exam session.
+                            </p>
                         </div>
                     </div>
-                )}
-
-                {/* Per-Question Breakdown */}
-                <h2 className="text-xl font-bold text-white mb-4">Question-by-Question Breakdown</h2>
-                <div className="space-y-4">
-                    {questions.map((q, index) => {
-                        const answer = answers.find(a => a.question_id === (q.id || index));
-                        const isSubjective = q.type === 'subjective';
-
-                        return (
-                            <div key={index} className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
-                                <div className="flex items-start justify-between mb-3">
-                                    <div className="flex items-start space-x-3 flex-1">
-                                        <span className="text-blue-500 font-bold">Q{index + 1}.</span>
-                                        <span className="text-white">{q.text}</span>
-                                    </div>
-                                    <span className={`text-xs px-2 py-1 rounded-lg border font-medium shrink-0 ml-3 ${isSubjective
-                                        ? 'bg-purple-900/30 text-purple-400 border-purple-900/50'
-                                        : 'bg-blue-900/30 text-blue-400 border-blue-900/50'
-                                        }`}>
-                                        {isSubjective ? 'Subjective' : 'MCQ'}
-                                    </span>
-                                </div>
-
-                                {/* Student's Answer */}
-                                <div className="bg-slate-900 rounded-xl p-4 mb-3 border border-slate-700/50">
-                                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Student's Answer</p>
-                                    <p className="text-slate-300">{answer?.answer_text || 'No answer provided'}</p>
-                                </div>
-
-                                {/* MCQ: show correct answer */}
-                                {!isSubjective && (
-                                    <div className="flex items-center space-x-2 mb-3">
-                                        {q.options && answer?.answer_text === q.options[q.correctOption] ? (
-                                            <CheckCircle2 size={16} className="text-green-400" />
-                                        ) : (
-                                            <XCircle size={16} className="text-red-400" />
-                                        )}
-                                        <span className="text-sm text-slate-400">
-                                            Correct: <span className="text-green-400">{q.options?.[q.correctOption]}</span>
-                                        </span>
-                                    </div>
-                                )}
-
-                                {/* Subjective: show model answer + ATI scores */}
-                                {isSubjective && (
-                                    <>
-                                        <div className="bg-slate-900/50 rounded-xl p-4 mb-3 border border-slate-700/30">
-                                            <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Model Answer</p>
-                                            <p className="text-slate-400 text-sm">{q.model_answer}</p>
-                                        </div>
-
-                                        {answer && Number.isFinite(answer.ati_score) && (
-                                            <div className="grid grid-cols-3 gap-3">
-                                                <div className="bg-blue-900/20 rounded-lg p-3 border border-blue-900/30 text-center">
-                                                    <p className={`text-lg font-bold ${getScoreColor(answer.semantic_score)}`}>
-                                                        {Number.isFinite(answer.semantic_score) ? Math.round(answer.semantic_score * 100) : '-'}%
-                                                    </p>
-                                                    <p className="text-xs text-slate-400">Content</p>
-                                                </div>
-                                                <div className="bg-purple-900/20 rounded-lg p-3 border border-purple-900/30 text-center">
-                                                    <p className={`text-lg font-bold ${getScoreColor(answer.similarity_score)}`}>
-                                                        {Number.isFinite(answer.similarity_score) ? Math.round(answer.similarity_score * 100) : '-'}%
-                                                    </p>
-                                                    <p className="text-xs text-slate-400">Pattern</p>
-                                                </div>
-                                                <div className="bg-cyan-900/20 rounded-lg p-3 border border-cyan-900/30 text-center">
-                                                    <p className={`text-lg font-bold ${getScoreColor(answer.ati_score)}`}>
-                                                        {Number.isFinite(answer.ati_score) ? Math.round(answer.ati_score) : '-'}
-                                                    </p>
-                                                    <p className="text-xs text-slate-400">ATI Score</p>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </>
-                                )}
-                            </div>
-                        );
-                    })}
                 </div>
-            </div>
+
+                <p className="text-center text-slate-300 text-[11px] font-bold uppercase tracking-widest mt-16">
+                    ATI Secure Smart Assessment Technology
+                </p>
+            </main>
         </div>
     );
 };
