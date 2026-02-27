@@ -66,6 +66,21 @@ exports.getTeacherExams = async (req, res) => {
     }
 };
 
+// Get teacher's exams — lightweight version for dashboard
+exports.getMyExams = async (req, res) => {
+    try {
+        const teacherId = req.user.id;
+        const result = await query(
+            'SELECT id, title, duration, status, created_at FROM exams WHERE teacher_id = $1 ORDER BY created_at DESC',
+            [teacherId]
+        );
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Get my exams error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
 /**
  * Submit exam — handles both MCQ and subjective questions.
  * Creates submission, individual answer rows, and triggers ATI scoring for subjective answers.

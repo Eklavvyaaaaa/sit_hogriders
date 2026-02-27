@@ -1,20 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import api from '../services/api';
-import { Shield, ChevronRight, Calendar, BookOpen, Clock } from 'lucide-react';
-
-const pastExams = [
-    { id: 1, subject: 'Computer Science', title: 'Algorithms Quiz', date: 'Feb 10, 2026', score: 92 },
-    { id: 2, subject: 'Mathematics', title: 'Linear Algebra Test', date: 'Feb 03, 2026', score: 78 },
-    { id: 3, subject: 'Physics', title: 'Optics Midterm', date: 'Jan 22, 2026', score: 85 },
-];
+import { Shield, ChevronRight, Calendar, BookOpen, Clock, Loader2, AlertTriangle } from 'lucide-react';
 
 const JoinClassroom = () => {
     const [code, setCode] = useState(['', '', '', '', '', '']);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    // Exam history state
+    const [pastExams, setPastExams] = useState([]);
+    const [historyLoading, setHistoryLoading] = useState(true);
+    const [historyError, setHistoryError] = useState(null);
+
     const navigate = useNavigate();
+
+    useEffect(() => {
+        const fetchHistory = async () => {
+            try {
+                setHistoryLoading(true);
+                setHistoryError(null);
+                const res = await api.get('/history/student');
+                // Limit to most recent 5 exams
+                setPastExams(res.data.slice(0, 5));
+            } catch (err) {
+                console.error('Failed to fetch exam history', err);
+                setHistoryError('Failed to load past exams.');
+            } finally {
+                setHistoryLoading(false);
+            }
+        };
+        fetchHistory();
+    }, []);
 
     const handleInput = (e, index) => {
         const value = e.target.value.toUpperCase();
@@ -58,10 +76,11 @@ const JoinClassroom = () => {
         }
     };
 
-    const upcomingExams = [
-        { id: 1, subject: 'Computer Science', title: 'Data Structures Midterm', date: 'Feb 28, 2026', duration: '60 min' },
-        { id: 2, subject: 'Mathematics', title: 'Calculus Final', date: 'Mar 02, 2026', duration: '90 min' }
-    ];
+    const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+    };
 
     const isComplete = code.join('').length === 6;
 
@@ -81,31 +100,129 @@ const JoinClassroom = () => {
                             </p>
                         </div>
 
+                        {/* Exam History Section */}
                         <div className="space-y-3">
                             <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Past Exam Results</p>
-                            <div className="space-y-3">
-                                {pastExams.map(exam => {
-                                    const scoreColor = exam.score >= 90
-                                        ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                                        : exam.score >= 75
-                                            ? 'bg-blue-50 text-blue-600 border-blue-100'
-                                            : 'bg-amber-50 text-amber-600 border-amber-100';
-                                    return (
-                                        <div key={exam.id} className="flex items-center justify-between bg-[#f0f7ff] rounded-xl px-5 py-4 border border-blue-50 hover:border-blue-200 transition-colors">
-                                            <div>
-                                                <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-0.5">{exam.subject}</p>
-                                                <p className="text-slate-800 font-bold text-sm">{exam.title}</p>
-                                                <span className="flex items-center gap-1 mt-1 text-xs text-slate-400">
-                                                    <Calendar size={10} /> {exam.date}
-                                                </span>
-                                            </div>
-                                            <div className={`min-w-[52px] text-center px-3 py-1.5 rounded-xl border text-lg font-black ${scoreColor}`}>
-                                                {exam.score}%
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
+
+                            {historyLoading ? (
+                                <div className="flex flex-col items-center justify-center py-6 bg-slate-50 rounded-xl border border-slate-100">
+                                    <Loader2 size={24} className="text-blue-400 animate-spin mb-2" />
+                                    <p className="text-slate-400 text-sm font-medium">Loading history...</p>
+                                </div>
+                            ) : historyError ? (
+                                <div className="bg-red-50 p-4 rounded-xl border border-red-100 flex items-center space-x-3">
+                                    <AlertTriangle size={18} className="text-red-400 shrink-0" />
+                                    <p className="text-red-600 text-sm font-bold flex-1">{historyError}</p>
+                                    <button
+                                        onClick={() => {
+                                            setHistoryLoading(true);
+                                            setHistoryError(null);
+                                            api.get('/history/student')
+                                                .then(res => setPastExams(res.data.slice(0, 5)))
+                                                .catch(() => setHistoryError('Failed to load past exams.'))
+                                                .finally(() => setHistoryLoading(false));
+                                        }}
+                                        className="text-[10px] bg-red-100 hover:bg-red-200 text-red-700 font-bold px-2 py-1 rounded uppercase tracking-wider transition-colors"
+                                    >
+                                        Retry
+                                    </button>
+                                </div>
+                            ) : pastExams.length === 0 ? (
+                                <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 text-center">
+                                    <p className="text-slate-500 text-sm font-medium">No past exams found.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {pastExams.map((exam, index) => {
+                                        const isGraded = exam.final_score != null;
+                                        const finalScore = isGraded ? Math.round(exam.final_score) : null;
+
+                                        // Determine visual style based on score or status
+                                        let statusConfig = {
+                                            bg: 'bg-slate-50',
+                                            text: 'text-slate-500',
+                                            border: 'border-slate-200',
+                                            label: 'Pending'
+                                        };
+
+                                        if (isGraded) {
+                                            if (finalScore >= 90) {
+                                                statusConfig = { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' };
+                                            } else if (finalScore >= 75) {
+                                                statusConfig = { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' };
+                                            } else {
+                                                statusConfig = { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' };
+                                            }
+                                        } else if (exam.status === 'in_progress' || exam.status === 'Evaluating') {
+                                            statusConfig = { bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-200', label: exam.status === 'in_progress' ? 'In Progress' : 'Evaluating' };
+                                        }
+
+                                        const canNavigate = !!exam.submission_id;
+
+                                        return (
+                                            <button
+                                                key={exam.submission_id || `exam-${index}`}
+                                                type="button"
+                                                onClick={() => { if (canNavigate) navigate(`/history/submission/${exam.submission_id}`); }}
+                                                disabled={!canNavigate}
+                                                className={`group relative flex items-center justify-between bg-white rounded-2xl p-5 border border-slate-200 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] transition-all duration-300 overflow-hidden text-left w-full ${canNavigate
+                                                        ? 'hover:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.1)] hover:border-blue-300 cursor-pointer'
+                                                        : 'opacity-70 cursor-default'
+                                                    }`}
+                                            >
+                                                {/* Left structural visual */}
+                                                <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-gradient-to-b from-blue-400 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+
+                                                <div className="flex-1 pr-4 pl-1">
+                                                    <div className="flex items-center space-x-2 mb-1.5">
+                                                        <span className="px-2 py-0.5 rounded text-[9px] font-black tracking-widest uppercase bg-slate-100 text-slate-500">
+                                                            {exam.exam_title ? exam.exam_title.split(' ')[0] : 'Exam'}
+                                                        </span>
+                                                        <p className={`text-[9px] font-black uppercase tracking-widest ${!isGraded ? 'text-indigo-500' : 'text-slate-400'
+                                                            }`}>
+                                                            {exam.status ? exam.status.replace('_', ' ') : 'completed'}
+                                                        </p>
+                                                    </div>
+
+                                                    <p className="text-slate-800 font-bold text-base tracking-tight leading-tight mb-2 group-hover:text-blue-700 transition-colors line-clamp-1">
+                                                        {exam.exam_title || 'Untitled Exam'}
+                                                    </p>
+
+                                                    <div className="flex items-center gap-3 text-xs text-slate-500 font-medium">
+                                                        <span className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-2 py-1 rounded-md text-[11px]">
+                                                            <Calendar size={12} className="text-slate-400" />
+                                                            {formatDate(exam.submitted_at)}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Score / Status Badge */}
+                                                <div className={`flex flex-col items-center justify-center min-w-[64px] h-[64px] rounded-xl border ${statusConfig.bg} ${statusConfig.border} ${statusConfig.text} transform group-hover:scale-105 transition-transform duration-300 shadow-sm`}>
+                                                    {isGraded ? (
+                                                        <>
+                                                            <span className="text-xl font-black tracking-tighter">{finalScore}</span>
+                                                            <span className="text-[9px] font-black tracking-widest opacity-80">%</span>
+                                                        </>
+                                                    ) : (
+                                                        <span className="text-[9px] font-black leading-[1.1] text-center px-1 uppercase tracking-widest">
+                                                            {statusConfig.label.split(' ').map((word, i) => <div key={i}>{word}</div>)}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {/* Hover Arrow */}
+                                                {canNavigate && (
+                                                    <div className="absolute right-[-40px] opacity-0 group-hover:opacity-100 group-hover:right-4 bg-white/50 backdrop-blur-sm h-full flex items-center transition-all duration-300">
+                                                        <div className="w-8 h-8 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-sm">
+                                                            <ChevronRight size={16} />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -179,29 +296,7 @@ const JoinClassroom = () => {
                             </div>
                         </div>
 
-                        {/* Upcoming exams in the right panel (mobile visible) */}
-                        <div className="space-y-4">
-                            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider pl-1">Upcoming Exams</h3>
-                            <div className="grid gap-4">
-                                {upcomingExams.map(exam => (
-                                    <div key={exam.id} className="bg-white p-5 rounded-xl border border-white/50 shadow-sm flex items-center justify-between group hover:border-blue-200 transition-all cursor-pointer">
-                                        <div>
-                                            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-0.5">{exam.subject}</p>
-                                            <p className="text-slate-800 font-bold text-sm tracking-tight">{exam.title}</p>
-                                            <div className="flex items-center space-x-4 mt-1 text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
-                                                <span className="flex items-center gap-1"><Calendar size={10} /> {exam.date}</span>
-                                                <span className="flex items-center gap-1"><Clock size={10} /> {exam.duration}</span>
-                                            </div>
-                                        </div>
-                                        <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-blue-600 group-hover:text-white transition-all">
-                                            <ChevronRight size={16} />
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <p className="text-center text-slate-400 text-[11px] font-semibold">
+                        <p className="text-center text-slate-400 text-[11px] font-semibold mt-8">
                             Protected by ATI Smart Monitoring Technology
                         </p>
                     </div>
