@@ -17,6 +17,11 @@ const authMiddleware = (roles = []) => {
                 return res.status(401).json({ message: 'Unauthorized: Missing token' });
             }
 
+            if (!process.env.JWT_SECRET) {
+                console.error("[CRITICAL] Server misconfiguration: process.env.JWT_SECRET is not defined.");
+                return res.status(500).json({ message: 'Internal Server Error' });
+            }
+
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
             if (roles.length > 0 && !roles.includes(decoded.role)) {
