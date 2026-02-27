@@ -200,7 +200,7 @@ const MonitorDashboard = () => {
                     <tr key={log.id} className="hover:bg-slate-800/80 transition-colors group">
                       <td className="p-6 text-slate-400 whitespace-nowrap">
                         <span className="bg-slate-900 px-3 py-1 rounded-lg border border-slate-800 font-mono text-sm">
-                          {new Date(log.timestamp).toLocaleString()}
+                          {new Date(log.timestamp).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
                         </span>
                       </td>
                       <td className="p-6 text-white font-medium">{log.student_name}</td>

@@ -149,6 +149,9 @@ const ChatBox = ({ examId }) => {
                                                 : 'bg-slate-800 text-slate-200 border border-slate-700 rounded-bl-sm'
                                             }`}>
                                             <p className="text-sm leading-relaxed">{msg.message_text}</p>
+                                            <p className={`text-[9px] mt-1 opacity-70 ${isMine ? 'text-right' : 'text-left'}`}>
+                                                {msg.created_at ? new Date(msg.created_at).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' }) : ''}
+                                            </p>
                                         </div>
                                     </div>
                                 );

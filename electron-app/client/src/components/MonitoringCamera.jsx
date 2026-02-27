@@ -114,7 +114,7 @@ const MonitoringCamera = ({ examId, stream }) => {
                         {alerts.slice().reverse().map((alert, i) => (
                             <li key={i} className="flex flex-col text-red-400 border-l-2 border-red-500 pl-2 py-1">
                                 <span className="font-semibold flex items-center"><AlertTriangle size={12} className="mr-1" /> {alert.type}</span>
-                                <span className="text-slate-500 text-[10px]">{alert.time.toLocaleTimeString()}</span>
+                                <span className="text-slate-500 text-[10px]">{alert.time.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })}</span>
                             </li>
                         ))}
                     </ul>
