@@ -1,0 +1,10 @@
+{
+    "student_answer": "Force equals mass times acceleration.",
+    "model_answer": "Newton's Second Law states that force equals mass multiplied by acceleration.",
+    "key_points": [
+        "Newton's Second Law",
+        "F = ma",
+        "Force equals mass times acceleration"
+    ],
+    "visual_score": 85
+}
