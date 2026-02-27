@@ -8,6 +8,7 @@ const authRoutes = require('./routes/authRoutes');
 const examRoutes = require('./routes/examRoutes');
 const classroomRoutes = require('./routes/classroomRoutes');
 const monitoringRoutes = require('./routes/monitoringRoutes');
+const submissionRoutes = require('./routes/submissionRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -20,6 +21,7 @@ app.use('/auth', authRoutes);
 app.use('/exam', examRoutes);
 app.use('/classroom', classroomRoutes);
 app.use('/monitor', monitoringRoutes);
+app.use('/submission', submissionRoutes);
 
 // Database initialization & Server start
 const startServer = async () => {

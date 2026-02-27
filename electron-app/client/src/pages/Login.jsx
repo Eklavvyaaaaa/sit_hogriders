@@ -25,6 +25,7 @@ const Login = () => {
                 navigate(user.role === 'teacher' ? '/teacher' : '/join');
             }
         } catch (err) {
+            console.error('Auth Error Full Dump:', err, err.response);
             setError(err.response?.data?.message || 'Authentication failed');
         }
     };
