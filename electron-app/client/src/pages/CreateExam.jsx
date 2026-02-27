@@ -15,11 +15,13 @@ const CreateExam = () => {
     const navigate = useNavigate();
 
     const addQuestion = (type = 'mcq') => {
-        if (type === 'subjective') {
-            setQuestions([...questions, { text: '', type: 'subjective', model_answer: '', key_points: [''] }]);
-        } else {
-            setQuestions([...questions, { text: '', type: 'mcq', options: ['', '', '', ''], correctOption: 0, model_answer: '', key_points: [''] }]);
-        }
+        setQuestions(prev => {
+            if (type === 'subjective') {
+                return [...prev, { text: '', type: 'subjective', model_answer: '', key_points: [''] }];
+            } else {
+                return [...prev, { text: '', type: 'mcq', options: ['', '', '', ''], correctOption: 0, model_answer: '', key_points: [''] }];
+            }
+        });
     };
 
     const toggleQuestionType = (index) => {
@@ -40,37 +42,45 @@ const CreateExam = () => {
     };
 
     const updateQuestion = (index, field, value) => {
-        const updated = [...questions];
-        updated[index][field] = value;
-        setQuestions(updated);
+        setQuestions(prev => prev.map((q, i) =>
+            i === index ? { ...q, [field]: value } : q
+        ));
     };
 
     const updateQuestionOption = (qIndex, oIndex, value) => {
-        const updated = [...questions];
-        updated[qIndex].options[oIndex] = value;
-        setQuestions(updated);
+        setQuestions(prev => prev.map((q, i) => {
+            if (i !== qIndex) return q;
+            const newOptions = [...q.options];
+            newOptions[oIndex] = value;
+            return { ...q, options: newOptions };
+        }));
     };
 
     const updateKeyPoint = (qIndex, kpIndex, value) => {
-        const updated = [...questions];
-        updated[qIndex].key_points[kpIndex] = value;
-        setQuestions(updated);
+        setQuestions(prev => prev.map((q, i) => {
+            if (i !== qIndex) return q;
+            const newKeyPoints = [...q.key_points];
+            newKeyPoints[kpIndex] = value;
+            return { ...q, key_points: newKeyPoints };
+        }));
     };
 
     const addKeyPoint = (qIndex) => {
-        const updated = [...questions];
-        updated[qIndex].key_points.push('');
-        setQuestions(updated);
+        setQuestions(prev => prev.map((q, i) => {
+            if (i !== qIndex) return q;
+            return { ...q, key_points: [...q.key_points, ''] };
+        }));
     };
 
     const removeKeyPoint = (qIndex, kpIndex) => {
-        const updated = [...questions];
-        updated[qIndex].key_points = updated[qIndex].key_points.filter((_, i) => i !== kpIndex);
-        setQuestions(updated);
+        setQuestions(prev => prev.map((q, i) => {
+            if (i !== qIndex) return q;
+            return { ...q, key_points: q.key_points.filter((_, k) => k !== kpIndex) };
+        }));
     };
 
     const removeQuestion = (index) => {
-        setQuestions(questions.filter((_, i) => i !== index));
+        setQuestions(prev => prev.filter((_, i) => i !== index));
     };
 
     const isFormValid = () => {

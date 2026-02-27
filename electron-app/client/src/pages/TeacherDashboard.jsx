@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import api from '../services/api';
-import { PlusCircle, Eye, Activity, BarChart3, Users, AlertTriangle, Flag, Download, Trophy, CheckCircle2, Loader2 } from 'lucide-react';
+import { PlusCircle, Eye, Activity, BarChart3, Users, AlertTriangle, Flag, Download, Trophy, CheckCircle2, Loader2, Clock, XCircle, CalendarClock, Copy } from 'lucide-react';
 
 const TeacherDashboard = () => {
     const [exams, setExams] = useState([]);
@@ -92,11 +92,60 @@ const TeacherDashboard = () => {
         }
     };
 
+    const handleChangeTime = async (examId) => {
+        const input = prompt('Enter new duration in minutes:');
+        if (!input) return;
+        const duration = Number(input);
+        if (isNaN(duration) || duration <= 0) {
+            alert('Please enter a valid positive number.');
+            return;
+        }
+        try {
+            await api.patch(`/exam/${examId}/time`, { duration });
+            alert('Exam duration updated successfully.');
+            fetchDashboardData();
+        } catch (err) {
+            console.error('Failed to update exam time', err);
+            alert('Failed to update exam duration.');
+        }
+    };
+
+    const handleTerminate = async (examId) => {
+        if (!window.confirm('Are you sure you want to terminate this exam? This action cannot be undone.')) return;
+        try {
+            await api.patch(`/exam/${examId}/terminate`, { status: 'terminated' });
+            alert('Exam terminated successfully.');
+            fetchDashboardData();
+        } catch (err) {
+            console.error('Failed to terminate exam', err);
+            alert('Failed to terminate exam.');
+        }
+    };
+
+    const handleReschedule = async (examId) => {
+        const input = prompt('Enter new scheduled time (e.g. 2026-03-01T10:00):');
+        if (!input) return;
+        const parsedDate = new Date(input);
+        if (isNaN(parsedDate.getTime())) {
+            alert('Please enter a valid date/time format.');
+            return;
+        }
+        try {
+            await api.patch(`/exam/${examId}/reschedule`, { new_time: parsedDate.toISOString() });
+            alert('Exam rescheduled successfully.');
+            fetchDashboardData();
+        } catch (err) {
+            console.error('Failed to reschedule exam', err);
+            alert('Failed to reschedule exam.');
+        }
+    };
+
     const getStatusBadge = (status) => {
         const colors = {
             scheduled: 'bg-yellow-900/30 text-yellow-400 border-yellow-900/50',
             active: 'bg-green-900/30 text-green-400 border-green-900/50',
-            completed: 'bg-slate-700/50 text-slate-400 border-slate-600'
+            completed: 'bg-slate-700/50 text-slate-400 border-slate-600',
+            terminated: 'bg-red-900/30 text-red-400 border-red-900/50'
         };
         return colors[status] || colors.scheduled;
     };
@@ -211,9 +260,19 @@ const TeacherDashboard = () => {
                                                     {exam.status || 'scheduled'}
                                                 </span>
                                             </div>
-                                            <div className="flex items-center space-x-2 text-slate-400 text-sm mb-4">
+                                            <div className="flex items-center flex-wrap gap-2 text-slate-400 text-sm mb-4">
                                                 <span className="bg-slate-900 px-2 py-1 rounded">Duration: {exam.duration} mins</span>
                                                 <span className="bg-slate-900 px-2 py-1 rounded">ID: {exam.id}</span>
+                                                {exam.exam_code && (
+                                                    <span
+                                                        className="bg-blue-900/30 text-blue-400 border border-blue-900/50 px-2 py-1 rounded font-mono cursor-pointer hover:bg-blue-900/50 transition-colors flex items-center space-x-1"
+                                                        onClick={() => { navigator.clipboard.writeText(exam.exam_code); alert('Exam code copied!'); }}
+                                                        title="Click to copy exam code"
+                                                    >
+                                                        <Copy size={12} />
+                                                        <span>Code: {exam.exam_code}</span>
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
 
@@ -232,6 +291,29 @@ const TeacherDashboard = () => {
                                                 >
                                                     <Eye size={16} />
                                                     <span>View Logs</span>
+                                                </button>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <button
+                                                    onClick={() => handleChangeTime(exam.id)}
+                                                    className="flex items-center justify-center space-x-1 bg-blue-900/30 hover:bg-blue-900/50 text-blue-400 py-2 rounded-lg text-xs font-medium transition-colors border border-blue-900/50"
+                                                >
+                                                    <Clock size={14} />
+                                                    <span>Change Time</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => handleTerminate(exam.id)}
+                                                    className="flex items-center justify-center space-x-1 bg-red-900/30 hover:bg-red-900/50 text-red-400 py-2 rounded-lg text-xs font-medium transition-colors border border-red-900/50"
+                                                >
+                                                    <XCircle size={14} />
+                                                    <span>Terminate</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => handleReschedule(exam.id)}
+                                                    className="flex items-center justify-center space-x-1 bg-violet-900/30 hover:bg-violet-900/50 text-violet-400 py-2 rounded-lg text-xs font-medium transition-colors border border-violet-900/50"
+                                                >
+                                                    <CalendarClock size={14} />
+                                                    <span>Reschedule</span>
                                                 </button>
                                             </div>
                                             <div className="grid grid-cols-4 gap-2">
