@@ -1,0 +1,24 @@
+{
+  "name": "sit_hogriders-main",
+  "version": "1.0.0",
+  "description": "A complete full-stack exam monitoring solution that uses AI (MediaPipe) to track student behavior during an exam. The student application runs securely in an Electron window (blocking other apps/shortcuts), while teachers have a web dashboard to create exams, generate classroom codes, and view live monitoring logs.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.19.0",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
