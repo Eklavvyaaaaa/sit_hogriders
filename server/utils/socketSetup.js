@@ -28,6 +28,22 @@ function initSocket(httpServer) {
             console.log(`Socket ${socket.id} joined exam:${parsedId}`);
         });
 
+        // Chat specific events to isolate from monitoring
+        socket.on('join:chat', (examId) => {
+            const parsedId = parseInt(examId, 10);
+            if (!parsedId || isNaN(parsedId) || parsedId <= 0) return;
+            socket.join(`chat:${parsedId}`);
+            console.log(`Socket ${socket.id} joined chat:${parsedId}`);
+        });
+
+        socket.on('send:message', (data) => {
+            const { examId, message } = data;
+            const parsedId = parseInt(examId, 10);
+            if (!parsedId || isNaN(parsedId) || parsedId <= 0) return;
+            // Broadcast to everyone else in the room
+            socket.to(`chat:${parsedId}`).emit('receive:message', message);
+        });
+
         socket.on('disconnect', () => {
             console.log(`Socket disconnected: ${socket.id}`);
         });

@@ -100,15 +100,24 @@ exports.joinClassroom = async (req, res) => {
         }
 
         // ── 1. Validate classroom code ──
-        const classroomResult = await query('SELECT * FROM classrooms WHERE code = $1', [code]);
+        const classroomResult = await query(
+            'SELECT * FROM classrooms WHERE code = $1',
+            [code]
+        );
         if (classroomResult.rows.length === 0) {
             return res.status(404).json({ message: 'Invalid classroom code' });
         }
         const classroom = classroomResult.rows[0];
 
-        // Check if classroom code has expired
-        if (classroom.expires_at && new Date(classroom.expires_at) < new Date()) {
-            return res.status(400).json({ message: 'Classroom code has expired' });
+        // Check if classroom code has expired (compare in DB timezone context)
+        if (classroom.expires_at) {
+            const expCheck = await query(
+                'SELECT expires_at < NOW() AS is_expired FROM classrooms WHERE id = $1',
+                [classroom.id]
+            );
+            if (expCheck.rows[0].is_expired) {
+                return res.status(400).json({ message: 'Classroom code has expired' });
+            }
         }
 
         // ── 2. Validate exam exists ──
