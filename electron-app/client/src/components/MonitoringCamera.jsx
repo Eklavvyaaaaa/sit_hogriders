@@ -4,7 +4,61 @@ import { Camera, AlertTriangle } from 'lucide-react';
 
 const MonitoringCamera = ({ examId }) => {
     const videoRef = useRef(null);
-    const { startMonitoring, stopMonitoring, alerts, isReady } = useMonitoring(examId);
+    const canvasRef = useRef(null);
+    const integrityRef = useRef(100);
+
+    const onFrameUpdate = (data) => {
+        const canvas = canvasRef.current;
+        const video = videoRef.current;
+        if (!canvas || !video) return;
+
+        const ctx = canvas.getContext('2d');
+        canvas.width = video.clientWidth;
+        canvas.height = video.clientHeight;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (!data) return;
+
+        const { boundingBox, yaw, pitch } = data;
+
+        // Calculate coordinates for unmirrored canvas laying over mirrored video
+        const boxScreenLeft = (1 - boundingBox.maxX) * canvas.width;
+        const boxScreenRight = (1 - boundingBox.minX) * canvas.width;
+        const boxScreenTop = boundingBox.minY * canvas.height;
+        const boxScreenBottom = boundingBox.maxY * canvas.height;
+
+        const width = boxScreenRight - boxScreenLeft;
+        const height = boxScreenBottom - boxScreenTop;
+
+        // Draw bounding box
+        ctx.strokeStyle = '#22c55e'; // green-500
+        ctx.lineWidth = 2;
+        ctx.strokeRect(boxScreenLeft, boxScreenTop, width, height);
+
+        // Draw Background for text
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.7)'; // slate-900 with opacity
+        ctx.fillRect(boxScreenLeft, boxScreenTop - 45, 110, 40);
+
+        // Draw Yaw and Pitch Text
+        ctx.fillStyle = '#22c55e';
+        ctx.font = '12px monospace';
+        ctx.fillText(`Yaw:   ${yaw.toFixed(3)}`, boxScreenLeft + 5, boxScreenTop - 25);
+        ctx.fillText(`Pitch: ${pitch.toFixed(3)}`, boxScreenLeft + 5, boxScreenTop - 10);
+
+        // Draw Integrity Score at top right
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.7)';
+        ctx.fillRect(canvas.width - 150, 10, 140, 30);
+        ctx.fillStyle = integrityRef.current > 50 ? '#22c55e' : '#ef4444'; // green or red
+        ctx.font = 'bold 14px monospace';
+        ctx.fillText(`Integrity: ${Math.round(integrityRef.current)}/100`, canvas.width - 140, 30);
+    };
+
+    const { startMonitoring, stopMonitoring, alerts, integrityScore, isReady, monitoringError } = useMonitoring(examId, onFrameUpdate);
+
+    useEffect(() => {
+        integrityRef.current = integrityScore;
+    }, [integrityScore]);
 
     useEffect(() => {
         if (isReady && videoRef.current) {
@@ -28,16 +82,28 @@ const MonitoringCamera = ({ examId }) => {
                 </div>
             </div>
 
-            <div className="relative aspect-video bg-black flex items-center justify-center">
+            <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
                 <video
                     ref={videoRef}
                     className="w-full h-full object-cover transform -scale-x-100" // Mirrors the video
                     muted
                     playsInline
                 />
-                {!isReady && (
+                <canvas
+                    ref={canvasRef}
+                    className="absolute inset-0 w-full h-full pointer-events-none"
+                // Canvas is NOT mirrored, coordinates are inverted via JS to keep text readable
+                />
+                {!isReady && !monitoringError && (
                     <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80">
                         <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                )}
+                {monitoringError && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/90 text-center px-4">
+                        <span className="text-yellow-500 text-sm font-semibold mb-1">⚠ Monitoring Unavailable</span>
+                        <span className="text-slate-400 text-xs">{monitoringError}</span>
+                        <span className="text-slate-500 text-[10px] mt-2">Your exam will continue without AI proctoring.</span>
                     </div>
                 )}
             </div>
