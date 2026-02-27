@@ -9,6 +9,42 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
 MAX_LENGTH = 5000
+MAX_KEY_POINTS = 20
+MAX_KEY_POINT_LENGTH = 500
+
+
+def validate_inputs(data):
+    """Validate and extract common inputs from request data.
+    Returns (inputs_dict, error_response) — error_response is None on success."""
+    student_answer = data.get("student_answer", "")
+    model_answer = data.get("model_answer", "")
+    key_points = data.get("key_points", [])
+
+    if not isinstance(student_answer, str) or not student_answer.strip():
+        return None, (jsonify({"error": "student_answer must be a non-empty string"}), 400)
+
+    if not isinstance(model_answer, str) or not model_answer.strip():
+        return None, (jsonify({"error": "model_answer must be a non-empty string"}), 400)
+
+    if len(student_answer) > MAX_LENGTH:
+        return None, (jsonify({"error": f"student_answer exceeds max length of {MAX_LENGTH}"}), 400)
+
+    if len(model_answer) > MAX_LENGTH:
+        return None, (jsonify({"error": f"model_answer exceeds max length of {MAX_LENGTH}"}), 400)
+
+    if not isinstance(key_points, list):
+        return None, (jsonify({"error": "key_points must be a list of strings"}), 400)
+
+    if len(key_points) > MAX_KEY_POINTS:
+        return None, (jsonify({"error": f"key_points exceeds max count of {MAX_KEY_POINTS}"}), 400)
+
+    for i, kp in enumerate(key_points):
+        if not isinstance(kp, str):
+            return None, (jsonify({"error": f"key_points[{i}] must be a string"}), 400)
+        if len(kp) > MAX_KEY_POINT_LENGTH:
+            return None, (jsonify({"error": f"key_points[{i}] exceeds max length of {MAX_KEY_POINT_LENGTH}"}), 400)
+
+    return {"student_answer": student_answer, "model_answer": model_answer, "key_points": key_points}, None
 
 
 @app.route("/health", methods=["GET"])
@@ -19,22 +55,16 @@ def health():
 @app.route("/evaluate-cis", methods=["POST"])
 def evaluate_cis():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
 
         if not data:
             return jsonify({"error": "No input data provided"}), 400
 
-        student_answer = data.get("student_answer", "")
-        model_answer = data.get("model_answer", "")
-        key_points = data.get("key_points", [])
+        inputs, err = validate_inputs(data)
+        if err:
+            return err
 
-        if not student_answer or not model_answer:
-            return jsonify({"error": "Missing required fields"}), 400
-
-        if len(student_answer) > MAX_LENGTH:
-            return jsonify({"error": "Answer too long"}), 400
-
-        result = calculate_cis(student_answer, model_answer, key_points)
+        result = calculate_cis(inputs["student_answer"], inputs["model_answer"], inputs["key_points"])
 
         return jsonify(result)
 
@@ -48,28 +78,23 @@ def evaluate_ati():
     try:
         logging.info("ATI evaluation requested")
 
-        data = request.get_json()
+        data = request.get_json(silent=True)
 
         if not data:
             return jsonify({"error": "No input data provided"}), 400
 
-        student_answer = data.get("student_answer", "")
-        model_answer = data.get("model_answer", "")
-        key_points = data.get("key_points", [])
+        inputs, err = validate_inputs(data)
+        if err:
+            return err
+
         visual_score = data.get("visual_score", 100)
 
-        if not student_answer or not model_answer:
-            return jsonify({"error": "Missing required fields"}), 400
-
-        if len(student_answer) > MAX_LENGTH:
-            return jsonify({"error": "Answer too long"}), 400
-
         # Content Score
-        cis_result = calculate_cis(student_answer, model_answer, key_points)
+        cis_result = calculate_cis(inputs["student_answer"], inputs["model_answer"], inputs["key_points"])
         content_score = cis_result["content_integrity_score"]
 
         # Pattern Score
-        pattern_score = calculate_pcs(student_answer, model_answer)
+        pattern_score = calculate_pcs(inputs["student_answer"], inputs["model_answer"])
 
         # ATI Calculation
         ati_score = (
