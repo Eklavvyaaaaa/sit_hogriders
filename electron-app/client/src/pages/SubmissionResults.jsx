@@ -33,8 +33,9 @@ const SubmissionResults = () => {
 
     const getScoreColor = (score) => {
         if (score === null || score === undefined) return 'text-slate-400';
-        if (score >= 0.8 || score >= 80) return 'text-green-400';
-        if (score >= 0.55 || score >= 55) return 'text-yellow-400';
+        const normalizedScore = score > 1 ? score / 100 : score;
+        if (normalizedScore >= 0.8) return 'text-green-400';
+        if (normalizedScore >= 0.55) return 'text-yellow-400';
         return 'text-red-400';
     };
 
@@ -113,8 +114,8 @@ const SubmissionResults = () => {
                                         <span className="text-white">{q.text}</span>
                                     </div>
                                     <span className={`text-xs px-2 py-1 rounded-lg border font-medium shrink-0 ml-3 ${isSubjective
-                                            ? 'bg-purple-900/30 text-purple-400 border-purple-900/50'
-                                            : 'bg-blue-900/30 text-blue-400 border-blue-900/50'
+                                        ? 'bg-purple-900/30 text-purple-400 border-purple-900/50'
+                                        : 'bg-blue-900/30 text-blue-400 border-blue-900/50'
                                         }`}>
                                         {isSubjective ? 'Subjective' : 'MCQ'}
                                     </span>
@@ -148,23 +149,23 @@ const SubmissionResults = () => {
                                             <p className="text-slate-400 text-sm">{q.model_answer}</p>
                                         </div>
 
-                                        {answer && answer.ati_score !== null && (
+                                        {answer && Number.isFinite(answer.ati_score) && (
                                             <div className="grid grid-cols-3 gap-3">
                                                 <div className="bg-blue-900/20 rounded-lg p-3 border border-blue-900/30 text-center">
                                                     <p className={`text-lg font-bold ${getScoreColor(answer.semantic_score)}`}>
-                                                        {answer.semantic_score !== null ? Math.round(answer.semantic_score * 100) : '-'}%
+                                                        {Number.isFinite(answer.semantic_score) ? Math.round(answer.semantic_score * 100) : '-'}%
                                                     </p>
                                                     <p className="text-xs text-slate-400">Content</p>
                                                 </div>
                                                 <div className="bg-purple-900/20 rounded-lg p-3 border border-purple-900/30 text-center">
                                                     <p className={`text-lg font-bold ${getScoreColor(answer.similarity_score)}`}>
-                                                        {answer.similarity_score !== null ? Math.round(answer.similarity_score * 100) : '-'}%
+                                                        {Number.isFinite(answer.similarity_score) ? Math.round(answer.similarity_score * 100) : '-'}%
                                                     </p>
                                                     <p className="text-xs text-slate-400">Pattern</p>
                                                 </div>
                                                 <div className="bg-cyan-900/20 rounded-lg p-3 border border-cyan-900/30 text-center">
                                                     <p className={`text-lg font-bold ${getScoreColor(answer.ati_score)}`}>
-                                                        {answer.ati_score !== null ? Math.round(answer.ati_score) : '-'}
+                                                        {Number.isFinite(answer.ati_score) ? Math.round(answer.ati_score) : '-'}
                                                     </p>
                                                     <p className="text-xs text-slate-400">ATI Score</p>
                                                 </div>

@@ -9,14 +9,17 @@ const ExamResults = () => {
     const navigate = useNavigate();
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
         const fetchResults = async () => {
             try {
                 const res = await api.get(`/history/exam/${examId}`);
                 setData(res.data);
+                setError(null);
             } catch (err) {
                 console.error('Failed to fetch results', err);
+                setError(err);
             } finally {
                 setLoading(false);
             }
@@ -25,6 +28,7 @@ const ExamResults = () => {
     }, [examId]);
 
     if (loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">Loading...</div>;
+    if (error) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-red-400">Error: {error.message || 'Failed to fetch results'}</div>;
     if (!data) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-red-400">No results found</div>;
 
     const { exam, results } = data;
@@ -93,7 +97,19 @@ const ExamResults = () => {
                         </thead>
                         <tbody className="divide-y divide-slate-700/50">
                             {results.map((r) => (
-                                <tr key={r.submission_id} className="hover:bg-slate-800/80 transition-colors cursor-pointer" onClick={() => navigate(`/results/${r.submission_id}`)}>
+                                <tr
+                                    key={r.submission_id}
+                                    className="hover:bg-slate-800/80 transition-colors cursor-pointer"
+                                    onClick={() => navigate(`/results/${r.submission_id}`)}
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            navigate(`/results/${r.submission_id}`);
+                                        }
+                                    }}
+                                >
                                     <td className="p-5">
                                         <div className="text-white font-medium">{r.student_name}</div>
                                         <div className="text-xs text-slate-400">{r.student_email}</div>

@@ -117,14 +117,7 @@ const initDB = async () => {
     ];
 
     for (const migration of migrations) {
-      try {
-        await pool.query(migration);
-      } catch (e) {
-        // Column might already exist, that's fine
-        if (!e.message.includes('already exists')) {
-          console.warn('Migration warning:', e.message);
-        }
-      }
+      await pool.query(migration);
     }
 
     console.log('Database tables initialized.');

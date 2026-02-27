@@ -23,16 +23,20 @@ const CreateExam = () => {
     };
 
     const toggleQuestionType = (index) => {
-        const updated = [...questions];
-        const q = updated[index];
-        if (q.type === 'mcq') {
-            q.type = 'subjective';
-        } else {
-            q.type = 'mcq';
-            if (!q.options) q.options = ['', '', '', ''];
-            if (q.correctOption === undefined) q.correctOption = 0;
-        }
-        setQuestions(updated);
+        setQuestions(prev => prev.map((q, i) => {
+            if (i !== index) return q;
+            if (q.type === 'mcq') {
+                return { ...q, type: 'subjective', model_answer: q.model_answer || '', key_points: q.key_points || [''] };
+            } else {
+                const { model_answer, key_points, ...rest } = q;
+                return {
+                    ...rest,
+                    type: 'mcq',
+                    options: q.options || ['', '', '', ''],
+                    correctOption: q.correctOption !== undefined ? q.correctOption : 0
+                };
+            }
+        }));
     };
 
     const updateQuestion = (index, field, value) => {
@@ -157,8 +161,8 @@ const CreateExam = () => {
                                             <button
                                                 onClick={() => toggleQuestionType(qIndex)}
                                                 className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors border ${q.type === 'subjective'
-                                                        ? 'bg-purple-900/30 text-purple-400 border-purple-900/50'
-                                                        : 'bg-blue-900/30 text-blue-400 border-blue-900/50'
+                                                    ? 'bg-purple-900/30 text-purple-400 border-purple-900/50'
+                                                    : 'bg-blue-900/30 text-blue-400 border-blue-900/50'
                                                     }`}
                                             >
                                                 {q.type === 'subjective' ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}

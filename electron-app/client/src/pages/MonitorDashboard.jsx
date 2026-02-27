@@ -42,9 +42,10 @@ const MonitorDashboard = () => {
   }, [examId]);
 
   const handleExportCSV = async () => {
+    let url;
     try {
       const res = await api.get(`/exam/${examId}/export`, { responseType: 'blob' });
-      const url = window.URL.createObjectURL(new Blob([res.data]));
+      url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `exam_${examId}_logs.csv`);
@@ -53,6 +54,8 @@ const MonitorDashboard = () => {
       link.remove();
     } catch (err) {
       console.error('Export failed', err);
+    } finally {
+      if (url) window.URL.revokeObjectURL(url);
     }
   };
 
@@ -117,7 +120,7 @@ const MonitorDashboard = () => {
               <span>Export CSV</span>
             </button>
             <button
-              onClick={fetchLogs}
+              onClick={() => { fetchLogs(); fetchStats(); }}
               className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl border border-slate-700 transition-colors shadow-lg shadow-slate-900/50"
             >
               <RefreshCw size={18} className={loading ? "animate-spin text-blue-400" : "text-blue-400"} />

@@ -105,27 +105,24 @@ exports.joinClassroom = async (req, res) => {
             ON CONFLICT (student_id, exam_id) DO NOTHING
         `, [studentId, exam.id]);
 
-        // Auto-activate exam on first student join
-        if (exam.status === 'scheduled') {
-            const endTime = new Date(Date.now() + exam.duration * 60 * 1000);
-            await query(
-                "UPDATE exams SET status = 'active', end_time = $1 WHERE id = $2",
-                [endTime.toISOString(), exam.id]
-            );
+        const io = getIO();
 
-            // Emit status change
-            const io = getIO();
-            if (io) {
-                io.to(`exam:${exam.id}`).emit('exam:statusChange', {
-                    examId: exam.id,
-                    status: 'active',
-                    endTime: endTime.toISOString()
-                });
-            }
+        // Auto-activate exam on first student join
+        const endTimeStr = new Date(Date.now() + exam.duration * 60 * 1000).toISOString();
+        const updateResult = await query(
+            "UPDATE exams SET status = 'active', end_time = $1 WHERE id = $2 AND status = 'scheduled' RETURNING end_time",
+            [endTimeStr, exam.id]
+        );
+
+        if (updateResult.rowCount > 0 && io) {
+            io.to(`exam:${exam.id}`).emit('exam:statusChange', {
+                examId: exam.id,
+                status: 'active',
+                endTime: updateResult.rows[0].end_time
+            });
         }
 
         // Emit student joined event
-        const io = getIO();
         if (io) {
             io.to(`exam:${exam.id}`).emit('student:joined', {
                 studentId,

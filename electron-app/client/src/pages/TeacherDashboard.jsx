@@ -66,9 +66,10 @@ const TeacherDashboard = () => {
     };
 
     const handleExportCSV = async (examId) => {
+        let url;
         try {
             const res = await api.get(`/exam/${examId}/export`, { responseType: 'blob' });
-            const url = window.URL.createObjectURL(new Blob([res.data]));
+            url = window.URL.createObjectURL(new Blob([res.data]));
             const link = document.createElement('a');
             link.href = url;
             link.setAttribute('download', `exam_${examId}_logs.csv`);
@@ -77,6 +78,8 @@ const TeacherDashboard = () => {
             link.remove();
         } catch (err) {
             console.error('Export failed', err);
+        } finally {
+            if (url) window.URL.revokeObjectURL(url);
         }
     };
 

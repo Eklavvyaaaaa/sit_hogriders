@@ -62,8 +62,16 @@ exports.getSubmissionDetail = async (req, res) => {
 
         // Get exam info
         const examResult = await query('SELECT * FROM exams WHERE id = $1', [submission.exam_id]);
+        if (!examResult.rows || examResult.rows.length === 0) {
+            return res.status(404).json({ message: 'Exam not found' });
+        }
         const exam = examResult.rows[0];
-        const questions = JSON.parse(exam.questions_json);
+        let questions = [];
+        try {
+            questions = JSON.parse(exam.questions_json);
+        } catch (err) {
+            console.error('Failed to parse questions_json', err);
+        }
 
         // Get individual answers with scores
         const answersResult = await query(`
