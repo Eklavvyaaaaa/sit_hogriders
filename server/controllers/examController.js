@@ -32,28 +32,33 @@ exports.getTeacherExams = async (req, res) => {
         const teacherId = req.user.id;
         const { status, highViolations } = req.query;
 
-        let sql = 'SELECT * FROM exams WHERE teacher_id = $1';
+        let sql = 'SELECT e.*, (SELECT c.code FROM classrooms c WHERE c.exam_id = e.id LIMIT 1) as exam_code FROM exams e WHERE e.teacher_id = $1';
         const params = [teacherId];
 
         if (status) {
             params.push(status);
-            sql += ` AND status = $${params.length}`;
+            sql += ` AND e.status = $${params.length}`;
         }
 
-        sql += ' ORDER BY created_at DESC NULLS LAST';
+        sql += ' ORDER BY e.created_at DESC NULLS LAST';
 
         const result = await query(sql, params);
         let exams = result.rows;
 
         if (highViolations === 'true') {
             const enrichedResult = await query(`
-                SELECT e.*, COUNT(m.id) as "violationCount"
+                SELECT e.*, 
+                       (SELECT c.code FROM classrooms c WHERE c.exam_id = e.id LIMIT 1) as exam_code, 
+                       COALESCE(m.violationCount, 0) as "violationCount"
                 FROM exams e
-                LEFT JOIN monitoring_logs m ON e.id = m.exam_id
+                LEFT JOIN (
+                    SELECT exam_id, COUNT(*) as violationCount
+                    FROM monitoring_logs
+                    GROUP BY exam_id
+                ) m ON e.id = m.exam_id
                 WHERE e.teacher_id = $1
                 ${status ? `AND e.status = $2` : ''}
-                GROUP BY e.id
-                HAVING COUNT(m.id) > 5
+                AND COALESCE(m.violationCount, 0) > 5
                 ORDER BY e.created_at DESC NULLS LAST
             `, status ? [teacherId, status] : [teacherId]);
             exams = enrichedResult.rows.map(row => ({ ...row, violationCount: parseInt(row.violationCount) }));
@@ -370,6 +375,91 @@ exports.exportExamLogs = async (req, res) => {
         res.send(headers + rows);
     } catch (error) {
         console.error('Export logs error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// Update exam duration (teacher only)
+exports.updateExamTime = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { duration } = req.body;
+        const teacherId = req.user.id;
+
+        if (!duration || typeof duration !== 'number' || duration <= 0) {
+            return res.status(400).json({ message: 'Valid duration (positive number) is required' });
+        }
+
+        const result = await query(
+            'UPDATE exams SET duration = $1 WHERE id = $2 AND teacher_id = $3 RETURNING *',
+            [duration, id, teacherId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Exam not found or unauthorized' });
+        }
+
+        res.json({ message: 'Exam duration updated', exam: result.rows[0] });
+    } catch (error) {
+        console.error('Update exam time error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// Terminate exam (teacher only)
+exports.terminateExam = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const teacherId = req.user.id;
+
+        const result = await query(
+            "UPDATE exams SET status = 'terminated' WHERE id = $1 AND teacher_id = $2 RETURNING *",
+            [id, teacherId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Exam not found or unauthorized' });
+        }
+
+        res.json({ message: 'Exam terminated', exam: result.rows[0] });
+    } catch (error) {
+        console.error('Terminate exam error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// Reschedule exam (teacher only)
+exports.rescheduleExam = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { new_time } = req.body;
+        const teacherId = req.user.id;
+
+        if (!new_time) {
+            return res.status(400).json({ message: 'new_time is required' });
+        }
+
+        const parsedTime = new Date(new_time);
+        if (isNaN(parsedTime.getTime())) {
+            return res.status(400).json({ message: 'Invalid date format for new_time' });
+        }
+
+        if (parsedTime <= new Date()) {
+            return res.status(400).json({ message: 'New schedule time must be in the future' });
+        }
+
+        const result = await query(
+            "UPDATE exams SET end_time = $1, status = 'scheduled' WHERE id = $2 AND teacher_id = $3 RETURNING *",
+            [parsedTime, id, teacherId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Exam not found or unauthorized' });
+        }
+
+        res.json({ message: 'Exam rescheduled', exam: result.rows[0] });
+    } catch (error) {
+        console.error('Reschedule exam error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 };
