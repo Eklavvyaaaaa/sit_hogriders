@@ -60,7 +60,11 @@ const SubmissionResults = () => {
                                 Student: <span className="text-white">{student.name}</span> ({student.email})
                             </p>
                             <p className="text-slate-400 text-sm">
+<<<<<<< HEAD
                                 Submitted: {submission.submitted_at ? new Date(submission.submitted_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'Not submitted'}
+=======
+                                Submitted: {submission.submitted_at ? new Date(submission.submitted_at).toLocaleString() : 'Not submitted'}
+>>>>>>> d779e8544c9cb639a7dd66c4f5986c5c8403f16c
                             </p>
                         </div>
                         {finalGrade && (

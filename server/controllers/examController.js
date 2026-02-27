@@ -292,17 +292,45 @@ exports.getExamStats = async (req, res) => {
             return res.status(403).json({ message: 'Unauthorized' });
         }
 
+<<<<<<< HEAD
         const studentsJoined = await query('SELECT COUNT(*) as count FROM students_exam WHERE exam_id = $1', [id]);
         const submissionsCount = await query('SELECT COUNT(*) as count FROM submissions WHERE exam_id = $1', [id]);
         const violationCount = await query('SELECT COUNT(*) as count FROM monitoring_logs WHERE exam_id = $1', [id]);
         const flaggedCount = await query('SELECT COUNT(*) as count FROM students_exam WHERE exam_id = $1 AND flagged = true', [id]);
 
+=======
+        const studentsJoined = await query('SELECT COUNT(DISTINCT student_id) as count FROM submissions WHERE exam_id = $1', [id]);
+        const submissionsCount = await query('SELECT COUNT(*) as count FROM submissions WHERE exam_id = $1 AND status = $2', [id, 'submitted']);
+        const violationCount = await query('SELECT COUNT(*) as count FROM monitoring_logs WHERE exam_id = $1', [id]);
+        const flaggedCount = await query('SELECT COUNT(*) as count FROM students_exam WHERE exam_id = $1 AND flagged = true', [id]);
+
+        const studentsList = await query(`
+            SELECT 
+                s.student_id, 
+                (SELECT COUNT(*) FROM monitoring_logs m WHERE m.exam_id = $1 AND m.user_id = s.student_id) as violation_count, 
+                MAX(COALESCE(se.flagged, false)::int) > 0 as flagged, 
+                u.name, 
+                u.email
+            FROM submissions s
+            JOIN users u ON s.student_id = u.id
+            LEFT JOIN students_exam se ON s.student_id = se.student_id AND s.exam_id = se.exam_id
+            WHERE s.exam_id = $1 AND s.status = 'in_progress'
+            GROUP BY s.student_id, u.name, u.email
+            ORDER BY u.name ASC
+        `, [id]);
+
+>>>>>>> d779e8544c9cb639a7dd66c4f5986c5c8403f16c
         res.json({
             studentsJoined: parseInt(studentsJoined.rows[0].count),
             submissions: parseInt(submissionsCount.rows[0].count),
             violations: parseInt(violationCount.rows[0].count),
             flaggedStudents: parseInt(flaggedCount.rows[0].count),
+<<<<<<< HEAD
             exam: examResult.rows[0]
+=======
+            exam: examResult.rows[0],
+            studentsList: studentsList.rows
+>>>>>>> d779e8544c9cb639a7dd66c4f5986c5c8403f16c
         });
     } catch (error) {
         console.error('Exam stats error:', error);

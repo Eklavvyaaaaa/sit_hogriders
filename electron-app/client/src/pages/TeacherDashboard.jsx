@@ -295,14 +295,22 @@ const TeacherDashboard = () => {
                                         <div className="pt-4 border-t border-slate-700 space-y-3">
                                             <div className="grid grid-cols-2 gap-3">
                                                 <button
+<<<<<<< HEAD
                                                     onClick={() => navigate(`/monitor/${exam.id}`)}
+=======
+                                                    onClick={() => navigate(`/monitor/${exam.id}`, { state: { tab: 'live' } })}
+>>>>>>> d779e8544c9cb639a7dd66c4f5986c5c8403f16c
                                                     className="flex items-center justify-center space-x-2 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-sm font-medium transition-colors"
                                                 >
                                                     <Activity size={16} />
                                                     <span>Live Monitor</span>
                                                 </button>
                                                 <button
+<<<<<<< HEAD
                                                     onClick={() => navigate(`/monitor/${exam.id}`)}
+=======
+                                                    onClick={() => navigate(`/monitor/${exam.id}`, { state: { tab: 'logs' } })}
+>>>>>>> d779e8544c9cb639a7dd66c4f5986c5c8403f16c
                                                     className="flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-indigo-600/20"
                                                 >
                                                     <Eye size={16} />

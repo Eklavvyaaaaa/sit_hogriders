@@ -86,7 +86,11 @@ const StudentHistory = () => {
                                         <div className="flex items-center space-x-6 text-sm text-slate-400">
                                             <span className="flex items-center space-x-1">
                                                 <Clock size={14} />
+<<<<<<< HEAD
                                                 <span>{item.submitted_at ? new Date(item.submitted_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', month: 'short', day: '2-digit', year: 'numeric' }) : 'Not submitted'}</span>
+=======
+                                                <span>{item.submitted_at ? new Date(item.submitted_at).toLocaleDateString() : 'Not submitted'}</span>
+>>>>>>> d779e8544c9cb639a7dd66c4f5986c5c8403f16c
                                             </span>
                                             <span className="flex items-center space-x-1">
                                                 <Timer size={14} />

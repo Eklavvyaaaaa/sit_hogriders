@@ -124,6 +124,13 @@ const initDB = async () => {
       "ALTER TABLE monitoring_logs ADD COLUMN IF NOT EXISTS severity TEXT DEFAULT 'medium'",
       "ALTER TABLE classrooms ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ",
       "ALTER TABLE classrooms ALTER COLUMN expires_at TYPE TIMESTAMPTZ",
+<<<<<<< HEAD
+=======
+      // Terminate and Last Chance Columns
+      "ALTER TABLE students_exam ADD COLUMN IF NOT EXISTS terminated BOOLEAN DEFAULT false",
+      "ALTER TABLE students_exam ADD COLUMN IF NOT EXISTS terminated_at TIMESTAMP",
+      "ALTER TABLE students_exam ADD COLUMN IF NOT EXISTS last_chance_used BOOLEAN DEFAULT false",
+>>>>>>> d779e8544c9cb639a7dd66c4f5986c5c8403f16c
       // Rename legacy 'message' column to 'message_text' if it exists
       "DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chat_messages' AND column_name='message') THEN ALTER TABLE chat_messages RENAME COLUMN message TO message_text; END IF; END $$"
     ];

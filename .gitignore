@@ -5,3 +5,7 @@ build/
 *.db
 .DS_Store
 electron-debug-log.txt
+<<<<<<< HEAD
+=======
+server/token.txt
+>>>>>>> d779e8544c9cb639a7dd66c4f5986c5c8403f16c

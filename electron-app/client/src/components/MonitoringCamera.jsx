@@ -15,6 +15,12 @@ const MonitoringCamera = ({ examId, stream }) => {
         const ctx = canvas.getContext('2d');
         canvas.width = video.clientWidth;
         canvas.height = video.clientHeight;
+<<<<<<< HEAD
+=======
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (isTerminated) return;
+>>>>>>> d779e8544c9cb639a7dd66c4f5986c5c8403f16c
 
         if (!data) return;
 
@@ -52,7 +58,11 @@ const MonitoringCamera = ({ examId, stream }) => {
         ctx.fillText(`Integrity: ${Math.round(integrityRef.current)}/100`, canvas.width - 140, 30);
     };
 
+<<<<<<< HEAD
     const { startMonitoring, stopMonitoring, alerts, integrityScore, isReady, monitoringError } = useMonitoring(examId, onFrameUpdate);
+=======
+    const { startMonitoring, stopMonitoring, alerts, integrityScore, isReady, monitoringError, isTerminated } = useMonitoring(examId, onFrameUpdate);
+>>>>>>> d779e8544c9cb639a7dd66c4f5986c5c8403f16c
 
     useEffect(() => {
         integrityRef.current = integrityScore;
@@ -92,18 +102,39 @@ const MonitoringCamera = ({ examId, stream }) => {
                     className="absolute inset-0 w-full h-full pointer-events-none"
                 // Canvas is NOT mirrored, coordinates are inverted via JS to keep text readable
                 />
+<<<<<<< HEAD
                 {!isReady && !monitoringError && (
+=======
+                {!isReady && !monitoringError && !isTerminated && (
+>>>>>>> d779e8544c9cb639a7dd66c4f5986c5c8403f16c
                     <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80">
                         <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                     </div>
                 )}
+<<<<<<< HEAD
                 {monitoringError && (
+=======
+                {monitoringError && !isTerminated && (
+>>>>>>> d779e8544c9cb639a7dd66c4f5986c5c8403f16c
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/90 text-center px-4">
                         <span className="text-yellow-500 text-sm font-semibold mb-1">⚠ Monitoring Unavailable</span>
                         <span className="text-slate-400 text-xs">{monitoringError}</span>
                         <span className="text-slate-500 text-[10px] mt-2">Your exam will continue without AI proctoring.</span>
                     </div>
                 )}
+<<<<<<< HEAD
+=======
+                {isTerminated && (
+                    <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-red-900/90 text-center px-6">
+                        <AlertTriangle size={48} className="text-red-500 mb-4 animate-bounce" />
+                        <h2 className="text-red-500 text-xl font-bold mb-2 uppercase tracking-widest">Session Terminated</h2>
+                        <span className="text-red-200 text-sm mb-4">You have exceeded the maximum allowed suspicious activities.</span>
+                        <span className="bg-red-950 text-red-400 px-4 py-2 border border-red-800 rounded-lg text-xs font-mono">
+                            Alert Count: {alerts.length}/15
+                        </span>
+                    </div>
+                )}
+>>>>>>> d779e8544c9cb639a7dd66c4f5986c5c8403f16c
             </div>
 
             <div className="p-3 max-h-32 overflow-y-auto bg-slate-900/30 text-xs">
