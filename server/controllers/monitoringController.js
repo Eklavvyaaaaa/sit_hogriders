@@ -186,22 +186,30 @@ exports.requestLastChance = async (req, res) => {
             console.error('Migration notice:', e.message);
         }
 
-        const checkResult = await query(`
-            SELECT last_chance_used FROM students_exam 
-            WHERE student_id = $1 AND exam_id = $2
-        `, [studentId, examId]);
-
-        if (checkResult.rowCount === 0) {
-            return res.status(404).json({ message: 'Session not found.' });
-        }
-
-        if (checkResult.rows[0].last_chance_used) {
-            return res.status(403).json({ message: 'Last chance attempt already used. Exam is permanently locked.' });
-        }
-
         const client = await pool.connect();
         try {
             await client.query('BEGIN');
+
+            const checkResult = await client.query(`
+                SELECT last_chance_used, terminated FROM students_exam 
+                WHERE student_id = $1 AND exam_id = $2
+                FOR UPDATE
+            `, [studentId, examId]);
+
+            if (checkResult.rowCount === 0) {
+                await client.query('ROLLBACK');
+                return res.status(404).json({ message: 'Session not found.' });
+            }
+
+            if (checkResult.rows[0].last_chance_used) {
+                await client.query('ROLLBACK');
+                return res.status(403).json({ message: 'Last chance attempt already used. Exam is permanently locked.' });
+            }
+
+            if (!checkResult.rows[0].terminated) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ message: 'Session is not terminated yet.' });
+            }
 
             // Wipe logs so they start fresh
             await client.query(`
@@ -217,14 +225,13 @@ exports.requestLastChance = async (req, res) => {
             `, [studentId, examId]);
 
             await client.query('COMMIT');
+            res.json({ message: 'Last chance granted. Warnings resetted to 0.' });
         } catch (err) {
             await client.query('ROLLBACK');
             throw err;
         } finally {
             client.release();
         }
-
-        res.json({ message: 'Last chance granted. Warnings resetted to 0.' });
     } catch (error) {
         console.error('Last chance error:', error);
         res.status(500).json({ message: 'Server error' });
