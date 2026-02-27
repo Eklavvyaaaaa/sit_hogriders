@@ -25,6 +25,7 @@ const Login = () => {
                 navigate(user.role === 'teacher' ? '/teacher' : '/join');
             }
         } catch (err) {
+            console.error('Authentication attempt failed:', err.message || err.response?.status);
             setError(err.response?.data?.message || 'Authentication failed');
         }
     };
