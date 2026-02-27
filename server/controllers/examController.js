@@ -46,19 +46,17 @@ exports.getTeacherExams = async (req, res) => {
         let exams = result.rows;
 
         if (highViolations === 'true') {
-            const enriched = [];
-            for (const exam of exams) {
-                const violationResult = await query(
-                    'SELECT COUNT(*) as count FROM monitoring_logs WHERE exam_id = $1',
-                    [exam.id]
-                );
-                const count = parseInt(violationResult.rows[0].count);
-                if (count > 5) {
-                    exam.violationCount = count;
-                    enriched.push(exam);
-                }
-            }
-            exams = enriched;
+            const enrichedResult = await query(`
+                SELECT e.*, COUNT(m.id) as "violationCount"
+                FROM exams e
+                LEFT JOIN monitoring_logs m ON e.id = m.exam_id
+                WHERE e.teacher_id = $1
+                ${status ? `AND e.status = $2` : ''}
+                GROUP BY e.id
+                HAVING COUNT(m.id) > 5
+                ORDER BY e.created_at DESC NULLS LAST
+            `, status ? [teacherId, status] : [teacherId]);
+            exams = enrichedResult.rows.map(row => ({ ...row, violationCount: parseInt(row.violationCount) }));
         }
 
         res.json(exams);
@@ -88,8 +86,20 @@ exports.submitExam = async (req, res) => {
         }
         const exam = examResult.rows[0];
 
-        if (exam.status === 'completed') {
-            return res.status(400).json({ message: 'Exam has already ended' });
+        if (exam.status !== 'active') {
+            return res.status(400).json({ message: 'Exam is not currently active' });
+        }
+
+        // Authorization: Verify the student is enrolled
+        const enrollResult = await query('SELECT * FROM students_exam WHERE exam_id = $1 AND student_id = $2', [examId, studentId]);
+        if (enrollResult.rows.length === 0) {
+            return res.status(403).json({ message: 'Not enrolled in this exam' });
+        }
+
+        // Avoid double submission
+        const subCheck = await query('SELECT id FROM submissions WHERE exam_id = $1 AND student_id = $2 AND status = $3', [examId, studentId, 'submitted']);
+        if (subCheck.rows.length > 0) {
+            return res.status(400).json({ message: 'Exam has already been submitted' });
         }
 
         // Parse exam questions
@@ -100,128 +110,131 @@ exports.submitExam = async (req, res) => {
             return res.status(500).json({ message: 'Failed to parse exam questions' });
         }
 
-        // Use a transaction for the entire submit flow
+        // 1. Calculate MCQ score
+        let mcqScore = 0;
+        let mcqCount = 0;
+        questions.forEach((q, index) => {
+            if (q.type !== 'subjective') {
+                mcqCount++;
+                const ans = answers[index];
+                if (ans && ans.selected === q.correctOption) {
+                    mcqScore++;
+                }
+            }
+        });
+
+        // 2. ATI scoring for subjective (outside transaction to avoid hanging)
+        let totalATI = 0;
+        let subjectiveCount = 0;
+        const atiEvaluations = [];
+
+        for (let i = 0; i < questions.length; i++) {
+            const q = questions[i];
+            const ans = answers[i] || answers[String(i)];
+
+            let answerText = '';
+            if (q.type === 'subjective') {
+                answerText = ans?.text || '';
+            } else {
+                const selectedIndex = ans?.selected;
+                answerText = (selectedIndex !== undefined && q.options) ? q.options[selectedIndex] || '' : '';
+            }
+
+            atiEvaluations.push({ questionIndex: i, answerText, q });
+
+            if (q.type === 'subjective' && answerText.trim()) {
+                const modelAnswer = q.model_answer || '';
+                const keyPoints = q.key_points || [];
+
+                let atiResult;
+                try {
+                    atiResult = await evaluateATI(answerText, modelAnswer, keyPoints);
+                } catch (err) {
+                    console.error(`ATI engine call failed:`, err.message);
+                    atiResult = {
+                        content_score: 0,
+                        pattern_score: 0,
+                        ati_score: 0,
+                        trust_level: 'Low Trust'
+                    };
+                }
+
+                atiEvaluations[i].atiResult = atiResult;
+                totalATI += atiResult.ati_score;
+                subjectiveCount++;
+            }
+        }
+
+        // 3. Calculate final grade
+        let finalScore = 0;
+        let trustFactor = 1.0;
+        let baseScore = 0;
+
+        if (subjectiveCount > 0) {
+            const avgATI = totalATI / subjectiveCount;
+            trustFactor = avgATI >= 80 ? 1.0 : avgATI >= 55 ? 0.85 : 0.6;
+
+            // Blend MCQ + ATI scores
+            const mcqPercent = mcqCount > 0 ? (mcqScore / mcqCount) * 100 : 0;
+            const totalQuestions = mcqCount + subjectiveCount;
+            const mcqWeight = mcqCount / totalQuestions;
+            const subjectiveWeight = subjectiveCount / totalQuestions;
+
+            baseScore = (mcqPercent * mcqWeight + avgATI * subjectiveWeight);
+            finalScore = baseScore * trustFactor;
+        } else {
+            // Pure MCQ exam
+            baseScore = mcqCount > 0 ? (mcqScore / mcqCount) * 100 : 0;
+            finalScore = baseScore;
+            trustFactor = 1.0;
+        }
+
+        // Use a transaction for the entire DB save operation
         const client = await pool.connect();
         try {
             await client.query('BEGIN');
 
-            // 1. Calculate MCQ score
-            let mcqScore = 0;
-            let mcqCount = 0;
-            questions.forEach((q, index) => {
-                if (q.type !== 'subjective') {
-                    mcqCount++;
-                    const ans = answers[index];
-                    if (ans && ans.selected === q.correctOption) {
-                        mcqScore++;
-                    }
-                }
-            });
-
-            // 2. Create submission
             const subResult = await client.query(
                 `INSERT INTO submissions (student_id, exam_id, answers_json, score, status, submitted_at)
-                 VALUES ($1, $2, $3, $4, 'submitted', CURRENT_TIMESTAMP) RETURNING id`,
+                     VALUES ($1, $2, $3, $4, 'submitted', CURRENT_TIMESTAMP) RETURNING id`,
                 [studentId, examId, JSON.stringify(answers), mcqScore]
             );
             const submissionId = subResult.rows[0].id;
 
-            // 3. Create individual answer rows + ATI scoring for subjective
-            let totalATI = 0;
-            let subjectiveCount = 0;
+            for (const evalData of atiEvaluations) {
+                const { questionIndex, answerText, q, atiResult } = evalData;
 
-            for (let i = 0; i < questions.length; i++) {
-                const q = questions[i];
-                const ans = answers[i] || answers[String(i)];
-
-                let answerText = '';
-                if (q.type === 'subjective') {
-                    answerText = ans?.text || '';
-                } else {
-                    // MCQ: store selected option text
-                    const selectedIndex = ans?.selected;
-                    answerText = (selectedIndex !== undefined && q.options) ? q.options[selectedIndex] || '' : '';
-                }
-
-                // Insert into answers table
                 const answerResult = await client.query(
                     'INSERT INTO answers (submission_id, question_id, answer_text) VALUES ($1, $2, $3) RETURNING id',
-                    [submissionId, q.id || i, answerText]
+                    [submissionId, q.id || questionIndex, answerText]
                 );
                 const answerId = answerResult.rows[0].id;
 
-                // 4. For subjective questions, call ATI engine
-                if (q.type === 'subjective' && answerText.trim()) {
-                    const modelAnswer = q.model_answer || '';
-                    const keyPoints = q.key_points || [];
-
-                    let atiResult;
-                    try {
-                        atiResult = await evaluateATI(answerText, modelAnswer, keyPoints);
-                    } catch (err) {
-                        console.error(`ATI engine call failed for answer ${answerId}:`, err.message);
-                        atiResult = {
-                            content_score: 0,
-                            pattern_score: 0,
-                            ati_score: 0,
-                            trust_level: 'Low Trust'
-                        };
-                    }
-
-                    // Store NLP evaluation
+                if (atiResult) {
                     await client.query(
                         `INSERT INTO nlp_evaluations (answer_id, semantic_score, reasoning_score)
-                         VALUES ($1, $2, $3) ON CONFLICT (answer_id) DO UPDATE SET semantic_score = $2, reasoning_score = $3`,
+                             VALUES ($1, $2, $3)`,
                         [answerId, atiResult.content_score / 100, atiResult.pattern_score / 100]
                     );
 
-                    // Store PAC score
                     await client.query(
-                        `INSERT INTO pac_scores (answer_id, similarity_score)
-                         VALUES ($1, $2) ON CONFLICT (answer_id) DO UPDATE SET similarity_score = $2`,
+                        `INSERT INTO pac_scores (answer_id, similarity_score) VALUES ($1, $2)`,
                         [answerId, atiResult.pattern_score / 100]
                     );
 
-                    // Store ATI score
                     await client.query(
-                        `INSERT INTO ati_scores (answer_id, ati_value)
-                         VALUES ($1, $2) ON CONFLICT (answer_id) DO UPDATE SET ati_value = $2`,
+                        `INSERT INTO ati_scores (answer_id, ati_value) VALUES ($1, $2)`,
                         [answerId, atiResult.ati_score]
                     );
-
-                    totalATI += atiResult.ati_score;
-                    subjectiveCount++;
                 }
-            }
-
-            // 5. Calculate final grade
-            let finalScore = 0;
-            let trustFactor = 1.0;
-
-            if (subjectiveCount > 0) {
-                const avgATI = totalATI / subjectiveCount;
-                trustFactor = avgATI >= 80 ? 1.0 : avgATI >= 55 ? 0.85 : 0.6;
-
-                // Blend MCQ + ATI scores
-                const mcqPercent = mcqCount > 0 ? (mcqScore / mcqCount) * 100 : 0;
-                const totalQuestions = mcqCount + subjectiveCount;
-                const mcqWeight = mcqCount / totalQuestions;
-                const subjectiveWeight = subjectiveCount / totalQuestions;
-
-                finalScore = (mcqPercent * mcqWeight + avgATI * subjectiveWeight) * trustFactor;
-            } else {
-                // Pure MCQ exam
-                finalScore = mcqCount > 0 ? (mcqScore / mcqCount) * 100 : 0;
-                trustFactor = 1.0;
             }
 
             await client.query(
                 `INSERT INTO final_grades (submission_id, base_score, trust_factor, final_score)
-                 VALUES ($1, $2, $3, $4) ON CONFLICT (submission_id) DO UPDATE SET base_score = $2, trust_factor = $3, final_score = $4`,
-                [submissionId, subjectiveCount > 0 ? totalATI / subjectiveCount : finalScore, trustFactor, finalScore]
+                     VALUES ($1, $2, $3, $4)`,
+                [submissionId, baseScore, trustFactor, finalScore]
             );
 
-            // 6. Mark as submitted in students_exam
             await client.query(
                 `UPDATE students_exam SET submitted = true WHERE student_id = $1 AND exam_id = $2`,
                 [studentId, examId]
@@ -323,9 +336,18 @@ exports.exportExamLogs = async (req, res) => {
             ORDER BY m.timestamp DESC
         `, [id]);
 
+        const escapeCSV = (field) => {
+            if (field == null) return '""';
+            let str = String(field);
+            if (/^[=+\-@]/.test(str)) {
+                str = "'" + str;
+            }
+            return `"${str.replace(/"/g, '""')}"`;
+        };
+
         const headers = 'ID,Student Name,Student Email,Event Type,Severity,Timestamp\n';
         const rows = logsResult.rows.map(r =>
-            `${r.id},"${r.student_name}","${r.student_email}","${r.event_type}","${r.severity || 'medium'}","${r.timestamp}"`
+            `${escapeCSV(r.id)},${escapeCSV(r.student_name)},${escapeCSV(r.student_email)},${escapeCSV(r.event_type)},${escapeCSV(r.severity || 'medium')},${escapeCSV(r.timestamp)}`
         ).join('\n');
 
         res.setHeader('Content-Type', 'text/csv');

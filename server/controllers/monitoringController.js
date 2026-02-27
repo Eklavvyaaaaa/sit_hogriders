@@ -29,33 +29,47 @@ exports.logEvent = async (req, res) => {
             RETURNING violation_count, flagged
         `, [studentId, examId]);
 
-        const { violation_count, flagged } = upsertResult.rows[0];
+        const { violation_count, flagged: initiallyFlagged } = upsertResult.rows[0];
+        let isFlagged = initiallyFlagged;
 
         // Auto-flag if >3 violations
-        if (violation_count > 3 && !flagged) {
+        if (violation_count > 3 && !isFlagged) {
             await query(
                 'UPDATE students_exam SET flagged = true WHERE student_id = $1 AND exam_id = $2',
                 [studentId, examId]
             );
+            isFlagged = true;
         }
 
         // Auto-submit if violation threshold exceeded
         let autoSubmitted = false;
         if (violation_count >= AUTO_SUBMIT_THRESHOLD) {
-            const submission = await query(
-                "SELECT id, status FROM submissions WHERE student_id = $1 AND exam_id = $2 AND status = 'in_progress'",
-                [studentId, examId]
-            );
-            if (submission.rows.length > 0) {
-                await query(
-                    "UPDATE submissions SET status = 'submitted', submitted_at = CURRENT_TIMESTAMP WHERE id = $1",
-                    [submission.rows[0].id]
-                );
-                await query(
-                    'UPDATE students_exam SET submitted = true WHERE student_id = $1 AND exam_id = $2',
+            const client = await pool.connect();
+            try {
+                await client.query('BEGIN');
+                const submission = await client.query(
+                    "SELECT id, status FROM submissions WHERE student_id = $1 AND exam_id = $2 AND status = 'in_progress'",
                     [studentId, examId]
                 );
-                autoSubmitted = true;
+
+                if (submission.rows.length > 0) {
+                    await client.query(
+                        "UPDATE submissions SET status = 'submitted', submitted_at = CURRENT_TIMESTAMP WHERE id = $1",
+                        [submission.rows[0].id]
+                    );
+                    await client.query(
+                        'UPDATE students_exam SET submitted = true WHERE student_id = $1 AND exam_id = $2',
+                        [studentId, examId]
+                    );
+                    autoSubmitted = true;
+                }
+                await client.query('COMMIT');
+            } catch (err) {
+                await client.query('ROLLBACK');
+                console.error('Transaction error in auto-submit:', err);
+                autoSubmitted = false;
+            } finally {
+                client.release();
             }
         }
 
@@ -68,7 +82,7 @@ exports.logEvent = async (req, res) => {
                 eventType,
                 severity: severityLevel,
                 violationCount: violation_count,
-                flagged: violation_count > 3,
+                flagged: isFlagged,
                 autoSubmitted,
                 timestamp: new Date().toISOString()
             });
@@ -77,7 +91,7 @@ exports.logEvent = async (req, res) => {
         res.status(201).json({
             message: autoSubmitted ? 'Log recorded. Exam auto-submitted due to excessive violations.' : 'Log recorded',
             violationCount: violation_count,
-            flagged: violation_count > 3,
+            flagged: isFlagged,
             autoSubmitted
         });
     } catch (error) {

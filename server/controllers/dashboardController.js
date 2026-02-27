@@ -1,63 +1,62 @@
 const { query } = require('../config/db');
 
 exports.getStats = async (req, res) => {
-    try {
-        const teacherId = req.user.id;
+  try {
+    const teacherId = req.user.id;
 
-        // Total exams for this teacher
-        const totalExams = await query('SELECT COUNT(*) as count FROM exams WHERE teacher_id = $1', [teacherId]);
+    // Single CTE query to fetch all stats efficiently
+    const statsQuery = `
+            WITH teacher_exams AS (
+                SELECT id FROM exams WHERE teacher_id = $1
+            ),
+            exam_counts AS (
+                SELECT 
+                    COUNT(*) as total,
+                    COUNT(*) FILTER (WHERE status = 'active') as active
+                FROM exams WHERE teacher_id = $1
+            ),
+            student_counts AS (
+                SELECT 
+                    COUNT(DISTINCT student_id) as total_students,
+                    COUNT(*) FILTER (WHERE flagged = true) as flagged_students
+                FROM students_exam 
+                WHERE exam_id IN (SELECT id FROM teacher_exams)
+            ),
+            violation_counts AS (
+                SELECT COUNT(*) as violations
+                FROM monitoring_logs 
+                WHERE exam_id IN (SELECT id FROM teacher_exams)
+            ),
+            avg_time AS (
+                SELECT COALESCE(
+                    AVG(EXTRACT(EPOCH FROM (s.submitted_at - se.joined_at)) / 60), 0
+                ) as avg_minutes
+                FROM submissions s
+                JOIN students_exam se ON s.student_id = se.student_id AND s.exam_id = se.exam_id
+                WHERE s.exam_id IN (SELECT id FROM teacher_exams) AND s.submitted_at IS NOT NULL
+            )
+            SELECT 
+                (SELECT total FROM exam_counts) as count,
+                (SELECT active FROM exam_counts) as active_count,
+                (SELECT total_students FROM student_counts) as unique_students,
+                (SELECT violations FROM violation_counts) as total_violations,
+                (SELECT flagged_students FROM student_counts) as flagged_count,
+                (SELECT avg_minutes FROM avg_time) as avg_minutes
+        `;
 
-        // Active exams
-        const activeExams = await query(
-            "SELECT COUNT(*) as count FROM exams WHERE teacher_id = $1 AND status = 'active'",
-            [teacherId]
-        );
+    const result = await query(statsQuery, [teacherId]);
+    const row = result.rows[0];
 
-        // Total unique students across teacher's exams
-        const totalStudents = await query(`
-      SELECT COUNT(DISTINCT se.student_id) as count
-      FROM students_exam se
-      JOIN exams e ON se.exam_id = e.id
-      WHERE e.teacher_id = $1
-    `, [teacherId]);
-
-        // Total violations across teacher's exams
-        const totalViolations = await query(`
-      SELECT COUNT(*) as count
-      FROM monitoring_logs ml
-      JOIN exams e ON ml.exam_id = e.id
-      WHERE e.teacher_id = $1
-    `, [teacherId]);
-
-        // Total flagged students
-        const flaggedStudents = await query(`
-      SELECT COUNT(*) as count
-      FROM students_exam se
-      JOIN exams e ON se.exam_id = e.id
-      WHERE e.teacher_id = $1 AND se.flagged = true
-    `, [teacherId]);
-
-        // Average completion time (from join to submission)
-        const avgCompletion = await query(`
-      SELECT COALESCE(
-        AVG(EXTRACT(EPOCH FROM (s.submitted_at - se.joined_at)) / 60), 0
-      ) as avg_minutes
-      FROM submissions s
-      JOIN students_exam se ON s.student_id = se.student_id AND s.exam_id = se.exam_id
-      JOIN exams e ON s.exam_id = e.id
-      WHERE e.teacher_id = $1 AND s.submitted_at IS NOT NULL
-    `, [teacherId]);
-
-        res.json({
-            totalExams: parseInt(totalExams.rows[0].count),
-            activeExams: parseInt(activeExams.rows[0].count),
-            totalStudents: parseInt(totalStudents.rows[0].count),
-            totalViolations: parseInt(totalViolations.rows[0].count),
-            flaggedStudents: parseInt(flaggedStudents.rows[0].count),
-            avgCompletionMinutes: Math.round(parseFloat(avgCompletion.rows[0].avg_minutes) * 10) / 10
-        });
-    } catch (error) {
-        console.error('Dashboard stats error:', error);
-        res.status(500).json({ message: 'Server error' });
-    }
+    res.json({
+      totalExams: parseInt(row.count || 0),
+      activeExams: parseInt(row.active_count || 0),
+      totalStudents: parseInt(row.unique_students || 0),
+      totalViolations: parseInt(row.total_violations || 0),
+      flaggedStudents: parseInt(row.flagged_count || 0),
+      avgCompletionMinutes: Math.round(parseFloat(row.avg_minutes || 0) * 10) / 10
+    });
+  } catch (error) {
+    console.error('Dashboard stats error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
 };

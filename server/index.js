@@ -20,7 +20,7 @@ const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
 
 // Initialize Socket.io
-const io = initSocket(server);
+initSocket(server);
 
 app.use(cors());
 app.use(express.json());

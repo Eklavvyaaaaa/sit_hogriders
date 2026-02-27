@@ -17,6 +17,7 @@ const ExamPage = () => {
     const [answers, setAnswers] = useState({});
     const [textAnswers, setTextAnswers] = useState({});
     const [isSubmitted, setIsSubmitted] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [hasStarted, setHasStarted] = useState(false);
     const [violationCount, setViolationCount] = useState(0);
     const removeFocusListenerRef = useRef(null);
@@ -116,6 +117,8 @@ const ExamPage = () => {
     };
 
     const handleSubmit = async () => {
+        if (isSubmitting) return;
+        setIsSubmitting(true);
         try {
             const score = calculateScore();
 
@@ -146,6 +149,7 @@ const ExamPage = () => {
             }
         } catch (err) {
             alert('Failed to submit exam');
+            setIsSubmitting(false);
         }
     };
 
@@ -253,9 +257,10 @@ const ExamPage = () => {
                                     handleSubmit();
                                 }
                             }}
-                            className="bg-blue-600 hover:bg-blue-500 text-white px-10 py-3 rounded-xl font-bold shadow-lg shadow-blue-600/20 transition-all transform active:scale-95"
+                            disabled={isSubmitting}
+                            className={`px-10 py-3 rounded-xl font-bold transition-all transform active:scale-95 text-white ${isSubmitting ? 'bg-slate-600 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-600/20'}`}
                         >
-                            Submit Exam
+                            {isSubmitting ? 'Submitting...' : 'Submit Exam'}
                         </button>
                     </div>
                 </div>

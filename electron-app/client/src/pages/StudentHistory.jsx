@@ -2,11 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import api from '../services/api';
-import { Clock, Award, AlertTriangle, ChevronRight, BookOpen } from 'lucide-react';
+import { Clock, Timer, Award, AlertTriangle, ChevronRight, BookOpen } from 'lucide-react';
 
 const StudentHistory = () => {
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -14,8 +15,10 @@ const StudentHistory = () => {
             try {
                 const res = await api.get('/history/student');
                 setHistory(res.data);
+                setError(null);
             } catch (err) {
                 console.error('Failed to fetch history', err);
+                setError(err);
             } finally {
                 setLoading(false);
             }
@@ -41,6 +44,8 @@ const StudentHistory = () => {
 
                 {loading ? (
                     <div className="text-center py-20 text-slate-400">Loading...</div>
+                ) : error ? (
+                    <div className="text-center py-20 text-red-400">Error: {error.message || 'Failed to fetch history'}</div>
                 ) : history.length === 0 ? (
                     <div className="text-center py-20 bg-slate-800/50 rounded-2xl border border-slate-700/50 border-dashed">
                         <BookOpen size={48} className="mx-auto text-slate-600 mb-4" />
@@ -59,6 +64,15 @@ const StudentHistory = () => {
                                 key={item.submission_id}
                                 onClick={() => navigate(`/results/${item.submission_id}`)}
                                 className="bg-slate-800 rounded-2xl p-6 border border-slate-700 hover:border-slate-500 cursor-pointer transition-all shadow-lg hover:shadow-xl group"
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`View results for ${item.exam_title}`}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        navigate(`/results/${item.submission_id}`);
+                                    }
+                                }}
                             >
                                 <div className="flex items-center justify-between">
                                     <div className="flex-1">
@@ -75,7 +89,7 @@ const StudentHistory = () => {
                                                 <span>{item.submitted_at ? new Date(item.submitted_at).toLocaleDateString() : 'Not submitted'}</span>
                                             </span>
                                             <span className="flex items-center space-x-1">
-                                                <Clock size={14} />
+                                                <Timer size={14} />
                                                 <span>{item.duration} mins</span>
                                             </span>
                                             {item.violation_count > 0 && (

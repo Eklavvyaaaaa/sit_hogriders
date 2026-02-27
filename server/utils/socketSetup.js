@@ -8,7 +8,7 @@ let io = null;
 function initSocket(httpServer) {
     io = new Server(httpServer, {
         cors: {
-            origin: '*',
+            origin: process.env.NODE_ENV === 'production' ? process.env.CLIENT_URL : '*',
             methods: ['GET', 'POST']
         }
     });
@@ -18,8 +18,14 @@ function initSocket(httpServer) {
 
         // Teachers join an exam room to receive updates
         socket.on('join:exam', (examId) => {
-            socket.join(`exam:${examId}`);
-            console.log(`Socket ${socket.id} joined exam:${examId}`);
+            const parsedId = parseInt(examId, 10);
+            if (!parsedId || isNaN(parsedId) || parsedId <= 0) {
+                console.log(`Invalid examId provided for socket join: ${examId}`);
+                return;
+            }
+            // Ideally we'd authenticate the token here, but basic validation is a start
+            socket.join(`exam:${parsedId}`);
+            console.log(`Socket ${socket.id} joined exam:${parsedId}`);
         });
 
         socket.on('disconnect', () => {
