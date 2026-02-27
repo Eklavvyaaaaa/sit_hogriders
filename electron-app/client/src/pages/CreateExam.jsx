@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import api from '../services/api';
-import { Plus, Trash2, Save, Users, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Plus, Trash2, Save, Users, ToggleLeft, ToggleRight, Loader2 } from 'lucide-react';
 
 const CreateExam = () => {
     const [title, setTitle] = useState('');
     const [duration, setDuration] = useState(60);
+    const [isSaving, setIsSaving] = useState(false);
     const [questions, setQuestions] = useState([
         { text: '', type: 'mcq', options: ['', '', '', ''], correctOption: 0, model_answer: '', key_points: [''] }
     ]);
@@ -85,6 +86,7 @@ const CreateExam = () => {
 
     const isFormValid = () => {
         if (!title) return false;
+        if (!Number.isInteger(duration) || duration < 1) return false;
         return questions.every(q => {
             if (!q.text) return false;
             if (q.type === 'mcq') {
@@ -96,6 +98,8 @@ const CreateExam = () => {
     };
 
     const handleSave = async () => {
+        if (isSaving) return;
+        setIsSaving(true);
         try {
             const examRes = await api.post('/exam/create', { title, duration, questions });
             const examId = examRes.data.examId;
@@ -104,7 +108,16 @@ const CreateExam = () => {
         } catch (err) {
             console.error(err);
             alert('Failed to create exam');
+        } finally {
+            setIsSaving(false);
         }
+    };
+
+    const handleDurationChange = (e) => {
+        const raw = e.target.value;
+        if (raw === '') { setDuration(''); return; }
+        const parsed = parseInt(raw, 10);
+        if (!isNaN(parsed) && parsed >= 1) setDuration(parsed);
     };
 
     return (
@@ -157,9 +170,11 @@ const CreateExam = () => {
                                 <label className="block text-[11px] text-slate-500 font-black uppercase tracking-widest mb-2">Duration (minutes)</label>
                                 <input
                                     type="number"
+                                    min="1"
+                                    step="1"
                                     className="w-full p-3.5 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-blue-600 focus:bg-white focus:ring-0 transition-all text-slate-900 placeholder-slate-400 font-medium"
                                     value={duration}
-                                    onChange={e => setDuration(Number(e.target.value))}
+                                    onChange={handleDurationChange}
                                 />
                             </div>
                         </div>
@@ -183,7 +198,12 @@ const CreateExam = () => {
                                             </button>
                                         </div>
                                         {questions.length > 1 && (
-                                            <button onClick={() => removeQuestion(qIndex)} className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors">
+                                            <button
+                                                onClick={() => removeQuestion(qIndex)}
+                                                className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                                                aria-label={`Delete question ${qIndex + 1}`}
+                                                title={`Delete question ${qIndex + 1}`}
+                                            >
                                                 <Trash2 size={16} />
                                             </button>
                                         )}
@@ -245,6 +265,8 @@ const CreateExam = () => {
                                                                 <button
                                                                     onClick={() => removeKeyPoint(qIndex, kpIndex)}
                                                                     className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"
+                                                                    aria-label={`Remove key point ${kpIndex + 1} from question ${qIndex + 1}`}
+                                                                    title={`Remove key point ${kpIndex + 1}`}
                                                                 >
                                                                     <Trash2 size={14} />
                                                                 </button>
@@ -287,11 +309,12 @@ const CreateExam = () => {
 
                             <button
                                 onClick={handleSave}
-                                disabled={!isFormValid()}
+                                disabled={!isFormValid() || isSaving}
+                                aria-busy={isSaving}
                                 className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white px-8 py-3 rounded-full font-black shadow-xl shadow-blue-200 transition-all active:scale-[0.98]"
                             >
-                                <Save size={18} />
-                                <span>Save & Generate Code</span>
+                                {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                                <span>{isSaving ? 'Saving...' : 'Save & Generate Code'}</span>
                             </button>
                         </div>
                     </>

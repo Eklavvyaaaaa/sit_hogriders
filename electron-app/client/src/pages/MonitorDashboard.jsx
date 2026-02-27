@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import api from '../services/api';
@@ -14,7 +14,7 @@ const MonitorDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [examStats, setExamStats] = useState(null);
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     try {
       const res = await api.get(`/monitor/logs/${examId}`);
       setLogs(res.data);
@@ -23,16 +23,16 @@ const MonitorDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [examId]);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const res = await api.get(`/exam/${examId}/stats`);
       setExamStats(res.data);
     } catch (err) {
       console.error(err);
     }
-  };
+  }, [examId]);
 
   useEffect(() => {
     fetchLogs();
@@ -42,7 +42,7 @@ const MonitorDashboard = () => {
       fetchStats();
     }, 5000);
     return () => clearInterval(interval);
-  }, [examId]);
+  }, [fetchLogs, fetchStats]);
 
   const handleExportCSV = async () => {
     let url;

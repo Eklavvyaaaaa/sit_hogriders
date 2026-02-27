@@ -86,7 +86,7 @@ const ChatBox = ({ examId }) => {
         e.preventDefault();
         if (!newMessage.trim() || isSending) return;
 
-        const messageText = newMessage.trim();
+        const messageText = newMessage.trim().slice(0, 2000); // Match server's 2000-char limit
         setNewMessage(''); // Clear input immediately
 
         // Optimistic: show message instantly (no id = optimistic)

@@ -77,6 +77,7 @@ const TeacherDashboard = () => {
             link.remove();
         } catch (err) {
             console.error('Export failed', err);
+            alert('Export failed: ' + (err.message || 'Unknown error'));
         } finally {
             if (url) window.URL.revokeObjectURL(url);
         }
@@ -339,7 +340,7 @@ const TeacherDashboard = () => {
                                                         <button
                                                             type="button"
                                                             className="bg-blue-50 text-blue-600 border border-blue-100 px-2 py-1 rounded-md font-mono text-[11px] cursor-pointer hover:bg-blue-100 transition-colors flex items-center space-x-1"
-                                                            onClick={() => navigator.clipboard.writeText(exam.exam_code).then(() => alert('Exam code copied!'))}
+                                                            onClick={() => navigator.clipboard.writeText(exam.exam_code).then(() => alert('Exam code copied!')).catch((err) => { console.error('Copy failed', err); alert('Failed to copy. Code: ' + exam.exam_code); })}
                                                             title="Click to copy exam code"
                                                         >
                                                             <Copy size={11} />

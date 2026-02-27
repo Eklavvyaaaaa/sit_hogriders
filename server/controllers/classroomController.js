@@ -246,7 +246,7 @@ exports.joinClassroom = async (req, res) => {
             }
         }
 
-        // ── 10. Sanitize questions: strip grading fields before sending to student ──
+        // ── 11. Sanitize questions: strip grading fields before sending to student ──
         const sanitizedQuestions = sanitizeQuestions(exam.questions_json);
 
         res.json({

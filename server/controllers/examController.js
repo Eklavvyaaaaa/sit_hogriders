@@ -480,15 +480,15 @@ exports.rescheduleExam = async (req, res) => {
 
 // Delete exam and all related data (teacher only)
 exports.deleteExam = async (req, res) => {
-    const client = await pool.connect();
+    let client;
     try {
+        client = await pool.connect();
         const { id } = req.params;
         const teacherId = req.user.id;
 
         // Verify ownership
         const examResult = await client.query('SELECT id FROM exams WHERE id = $1 AND teacher_id = $2', [id, teacherId]);
         if (examResult.rows.length === 0) {
-            client.release();
             return res.status(404).json({ message: 'Exam not found or unauthorized' });
         }
 
@@ -523,10 +523,10 @@ exports.deleteExam = async (req, res) => {
         await client.query('COMMIT');
         res.json({ message: 'Exam deleted successfully' });
     } catch (error) {
-        await client.query('ROLLBACK');
+        if (client) await client.query('ROLLBACK').catch(() => { });
         console.error('Delete exam error:', error);
         res.status(500).json({ message: 'Server error' });
     } finally {
-        client.release();
+        if (client) client.release();
     }
 };

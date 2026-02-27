@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import api from '../services/api';
 import { AuthContext } from '../context/AuthContext';
-import { ArrowLeft, Award, Brain, Shield, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
+import { ArrowLeft, Award, Brain, Shield, CheckCircle2, XCircle } from 'lucide-react';
 
 const SubmissionResults = () => {
     const { submissionId } = useParams();
@@ -118,7 +118,7 @@ const SubmissionResults = () => {
                 <h2 className="text-lg font-black text-slate-900 tracking-tight mb-4">Question-by-Question Breakdown</h2>
                 <div className="space-y-4">
                     {questions.map((q, index) => {
-                        const answer = answers.find(a => a.question_id === (q.id || index));
+                        const answer = answers.find(a => a.question_id === (q.id ?? index));
                         const isSubjective = q.type === 'subjective';
 
                         return (

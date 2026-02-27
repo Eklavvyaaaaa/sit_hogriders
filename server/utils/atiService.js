@@ -1,4 +1,4 @@
-const ATI_ENGINE_URL = process.env.ATI_ENGINE_URL || 'http://localhost:8000';
+const ATI_ENGINE_URL = process.env.ATI_ENGINE_URL; // No localhost default — avoids unnecessary external calls
 
 // ─── Text Preprocessing ────────────────────────────────────────────────────────
 function preprocess(text) {
@@ -49,7 +49,7 @@ function computeConceptCoverage(studentAnswer, keyPoints) {
 
     for (const kp of keyPoints) {
         const kpTokens = tokenize(kp);
-        // A key point is "covered" if at least 50% of its words appear in the student answer
+        // Fractional coverage: accumulates the proportion of matched key point words
         const matchCount = kpTokens.filter(t => studentTokens.has(t)).length;
         const coverage = kpTokens.length > 0 ? matchCount / kpTokens.length : 0;
         covered += coverage;
@@ -147,30 +147,33 @@ function calculatePCS(studentAnswer, modelAnswer) {
  *   ATI = 0.5 * content_score + 0.3 * visual_score + 0.2 * pattern_score
  */
 async function evaluateATI(studentAnswer, modelAnswer, keyPoints = [], visualScore = 100) {
-    // Try external engine first (if configured and reachable)
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout for external
+    // Try external engine only if URL is configured
+    if (ATI_ENGINE_URL) {
+        let timeoutId;
+        try {
+            const controller = new AbortController();
+            timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
 
-        const response = await fetch(`${ATI_ENGINE_URL}/evaluate-ati`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            signal: controller.signal,
-            body: JSON.stringify({
-                student_answer: studentAnswer,
-                model_answer: modelAnswer,
-                key_points: keyPoints,
-                visual_score: visualScore
-            })
-        });
+            const response = await fetch(`${ATI_ENGINE_URL}/evaluate-ati`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                signal: controller.signal,
+                body: JSON.stringify({
+                    student_answer: studentAnswer,
+                    model_answer: modelAnswer,
+                    key_points: keyPoints,
+                    visual_score: visualScore
+                })
+            });
 
-        clearTimeout(timeoutId);
-
-        if (response.ok) {
-            return response.json();
+            if (response.ok) {
+                return await response.json();
+            }
+        } catch (_) {
+            // External engine unreachable — fall through to local evaluation
+        } finally {
+            if (timeoutId) clearTimeout(timeoutId);
         }
-    } catch (_) {
-        // External engine unreachable — fall through to local evaluation
     }
 
     // ── Local evaluation (Node.js implementation) ──

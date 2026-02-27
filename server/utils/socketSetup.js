@@ -3,7 +3,19 @@ const jwt = require('jsonwebtoken');
 const { query } = require('../config/db');
 
 // In-memory cache: userId -> { name, role }
+// Bounded to prevent memory leaks
+const MAX_CACHE_SIZE = 500;
 const userInfoCache = new Map();
+
+function cacheSet(key, value) {
+    // Simple LRU: delete oldest entries when cache exceeds max size
+    if (userInfoCache.size >= MAX_CACHE_SIZE) {
+        const oldest = userInfoCache.keys().next().value;
+        userInfoCache.delete(oldest);
+    }
+    userInfoCache.set(key, value);
+}
+
 
 let io = null;
 
@@ -94,7 +106,7 @@ function initSocket(httpServer) {
                 if (!userInfoCache.has(socket.user.id)) {
                     const userRes = await query('SELECT name, role FROM users WHERE id = $1', [socket.user.id]);
                     if (userRes.rows.length > 0) {
-                        userInfoCache.set(socket.user.id, userRes.rows[0]);
+                        cacheSet(socket.user.id, userRes.rows[0]);
                     }
                 }
 

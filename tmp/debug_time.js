@@ -1,4 +1,4 @@
-const { query } = require('./server/config/db');
+const { query } = require('../server/config/db');
 
 async function debugTime() {
     try {

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import api from '../services/api';
-import { Clock, Timer, Award, AlertTriangle, ChevronRight, BookOpen } from 'lucide-react';
+import { Clock, Timer, AlertTriangle, ChevronRight, BookOpen } from 'lucide-react';
 
 const StudentHistory = () => {
     const [history, setHistory] = useState([]);
@@ -101,7 +101,7 @@ const StudentHistory = () => {
                                             <td className="p-4">
                                                 <span className="flex items-center space-x-1 text-slate-500 text-sm">
                                                     <Timer size={13} className="text-slate-400" />
-                                                    <span>{item.duration} mins</span>
+                                                    <span>{item.duration != null ? `${item.duration} mins` : '—'}</span>
                                                 </span>
                                             </td>
                                             <td className="p-4">
@@ -116,14 +116,14 @@ const StudentHistory = () => {
                                             </td>
                                             <td className="p-4">
                                                 <span className={`text-[10px] px-2 py-1 rounded-md border font-black uppercase tracking-widest ${item.status === 'submitted'
-                                                        ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
-                                                        : 'bg-amber-50 text-amber-600 border-amber-200'
+                                                    ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                                                    : 'bg-amber-50 text-amber-600 border-amber-200'
                                                     }`}>
                                                     {item.status}
                                                 </span>
                                             </td>
                                             <td className="p-4">
-                                                {item.final_score !== null && (
+                                                {item.final_score != null && (
                                                     <span className={`inline-flex items-center justify-center min-w-[44px] px-2.5 py-1.5 rounded-lg border font-black text-base ${scoreBadge.bg} ${scoreBadge.border} ${scoreBadge.text}`}>
                                                         {Math.round(item.final_score)}
                                                     </span>

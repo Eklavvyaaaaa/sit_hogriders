@@ -71,7 +71,7 @@ const ExamResults = () => {
                 </div>
 
                 {/* Summary Cards */}
-                <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                     <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] text-center">
                         <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center mx-auto mb-2">
                             <Users size={20} className="text-blue-600" />
@@ -107,7 +107,7 @@ const ExamResults = () => {
                                 <th className="p-4">Final Score</th>
                                 <th className="p-4">Violations</th>
                                 <th className="p-4">Status</th>
-                                <th className="p-4"></th>
+                                <th className="p-4"><span className="sr-only">Actions</span></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
