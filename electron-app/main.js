@@ -1,9 +1,23 @@
-const { app, BrowserWindow, globalShortcut, ipcMain } = require('electron');
+const { app, BrowserWindow, globalShortcut, ipcMain, session } = require('electron');
 const path = require('path');
 const isDev = require('electron-is-dev');
 
+// Global Exception Handlers to Prevent Crash
+process.on('uncaughtException', (error) => {
+  console.error('[Electron] Uncaught Exception:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Electron] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 let mainWindow;
 let isLocked = false;
+
+// Fix Windows "Access is denied (0x5)" and GPU Cache errors
+app.setPath('userData', path.join(app.getPath('appData'), 'sit_hogriders_cache'));
+app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
+app.commandLine.appendSwitch('disable-gpu-disk-cache'); // Prevent the failed: -2 error
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -14,8 +28,29 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
-      devTools: isDev // Only enable devTools in development environment
+      devTools: isDev, // Only enable devTools in development environment
+      backgroundThrottling: false,
+      webgl: true,
+      sandbox: false // Required for some hardware accelerated MediaPipe flows
     }
+  });
+
+  // Handle Permissions for Camera/Microphone automatically
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    const allowedPermissions = ['media', 'camera', 'microphone'];
+    if (allowedPermissions.includes(permission)) {
+      callback(true);
+    } else {
+      callback(false);
+    }
+  });
+
+  session.defaultSession.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
+    const allowedPermissions = ['media', 'camera', 'microphone'];
+    if (allowedPermissions.includes(permission)) {
+      return true;
+    }
+    return false;
   });
 
   // Load React app
