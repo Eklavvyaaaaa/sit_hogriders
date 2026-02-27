@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { useMonitoring } from '../hooks/useMonitoring';
 import { Camera, AlertTriangle } from 'lucide-react';
 
-const MonitoringCamera = ({ examId }) => {
+const MonitoringCamera = ({ examId, stream }) => {
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
     const integrityRef = useRef(100);
@@ -62,7 +62,7 @@ const MonitoringCamera = ({ examId }) => {
 
     useEffect(() => {
         if (isReady && videoRef.current) {
-            startMonitoring(videoRef.current);
+            startMonitoring(videoRef.current, stream);
         }
         return () => {
             stopMonitoring();
