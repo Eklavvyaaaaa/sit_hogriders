@@ -301,14 +301,14 @@ exports.getExamStats = async (req, res) => {
             SELECT 
                 s.student_id, 
                 (SELECT COUNT(*) FROM monitoring_logs m WHERE m.exam_id = $1 AND m.user_id = s.student_id) as violation_count, 
-                COALESCE(se.flagged, false) as flagged, 
+                MAX(COALESCE(se.flagged, false)::int) > 0 as flagged, 
                 u.name, 
                 u.email
             FROM submissions s
             JOIN users u ON s.student_id = u.id
             LEFT JOIN students_exam se ON s.student_id = se.student_id AND s.exam_id = se.exam_id
             WHERE s.exam_id = $1 AND s.status = 'in_progress'
-            GROUP BY s.student_id, u.name, u.email, se.flagged
+            GROUP BY s.student_id, u.name, u.email
             ORDER BY u.name ASC
         `, [id]);
 
