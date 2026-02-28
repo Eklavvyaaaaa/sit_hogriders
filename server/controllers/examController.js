@@ -544,3 +544,87 @@ exports.deleteExam = async (req, res) => {
         if (client) client.release();
     }
 };
+
+// Stop exam (teacher only)
+exports.stopExam = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const teacherId = req.user.id;
+
+        const result = await query(
+            "UPDATE exams SET status = 'stopped' WHERE id = $1 AND teacher_id = $2 RETURNING *",
+            [id, teacherId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Exam not found or unauthorized' });
+        }
+
+        res.json({ message: 'Exam stopped', exam: result.rows[0] });
+    } catch (error) {
+        console.error('Stop exam error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// Extend exam duration (teacher only)
+exports.extendExam = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { extra_minutes } = req.body;
+        const teacherId = req.user.id;
+
+        if (!Number.isFinite(extra_minutes) || !Number.isInteger(extra_minutes) || extra_minutes <= 0) {
+            return res.status(400).json({ message: 'extra_minutes must be a positive integer' });
+        }
+
+        const result = await query(
+            'UPDATE exams SET duration = duration + $1 WHERE id = $2 AND teacher_id = $3 RETURNING *',
+            [extra_minutes, id, teacherId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Exam not found or unauthorized' });
+        }
+
+        res.json({ message: 'Exam duration extended', exam: result.rows[0] });
+    } catch (error) {
+        console.error('Extend exam error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// Grant reattempt to a specific student (teacher only)
+exports.grantReattempt = async (req, res) => {
+    try {
+        const { examId, studentId } = req.params;
+        const teacherId = req.user.id;
+
+        // Verify teacher owns this exam
+        const examCheck = await query('SELECT id FROM exams WHERE id = $1 AND teacher_id = $2', [examId, teacherId]);
+        if (examCheck.rows.length === 0) {
+            return res.status(404).json({ message: 'Exam not found or unauthorized' });
+        }
+
+        // Update only the latest submitted attempt for this student
+        const result = await query(
+            `UPDATE submissions SET status = 'reopened'
+             WHERE id = (
+                 SELECT id FROM submissions
+                 WHERE exam_id = $1 AND student_id = $2 AND status = 'submitted'
+                 ORDER BY created_at DESC LIMIT 1
+             ) RETURNING *`,
+            [examId, studentId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'No submission found for this student and exam' });
+        }
+
+        res.json({ message: 'Reattempt granted', submission: result.rows[0] });
+    } catch (error) {
+        console.error('Grant reattempt error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+

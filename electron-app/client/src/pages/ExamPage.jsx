@@ -5,11 +5,13 @@ import QuestionCard from '../components/QuestionCard';
 import MonitoringCamera from '../components/MonitoringCamera';
 import api from '../services/api';
 import { AuthContext } from '../context/AuthContext';
-import { CheckCircle2, ShieldCheck, PlayCircle, LogIn, ChevronLeft, ChevronRight, Info } from 'lucide-react';
+import { CheckCircle2, ShieldCheck, PlayCircle, ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import ChatBox from '../components/ChatBox';
 import { io } from 'socket.io-client';
 import Cookies from 'js-cookie';
 
+import { useToast } from '../hooks/useToast';
+import ToastOverlay from '../components/ToastOverlay';
 
 const ExamPage = () => {
     const location = useLocation();
@@ -28,6 +30,10 @@ const ExamPage = () => {
     const removeFocusListenerRef = useRef(null);
     const streamRef = useRef(null);
     const ignoreNextBlur = useRef(false);
+    const { toasts, addToast, removeToast } = useToast();
+
+    // Confirm modal state
+    const [confirmModal, setConfirmModal] = useState(null);
 
     useEffect(() => {
         if (!examData) {
@@ -126,6 +132,13 @@ const ExamPage = () => {
 
             socket.disconnect();
             Object.values(peers).forEach(pc => pc.close());
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => { streamRef.current = stream; })
+            .catch(err => { console.error("Camera pre-fetch failed:", err); });
+        return () => {
+            if (removeFocusListenerRef.current) removeFocusListenerRef.current();
+            if (window.electronAPI) window.electronAPI.deactivateLock();
+            if (streamRef.current) streamRef.current.getTracks().forEach(t => { t.stop(); });
         };
     }, [examData, navigate]);
 
@@ -134,18 +147,11 @@ const ExamPage = () => {
         setHasStarted(true);
         if (window.electronAPI) {
             window.electronAPI.activateLock();
-
             removeFocusListenerRef.current = window.electronAPI.onFocusLost(() => {
-                if (ignoreNextBlur.current) {
-                    ignoreNextBlur.current = false;
-                    return;
-                }
+                if (ignoreNextBlur.current) { ignoreNextBlur.current = false; return; }
                 logViolation('Window Focus Lost');
             });
-
-            setTimeout(() => {
-                ignoreNextBlur.current = false;
-            }, 2000);
+            setTimeout(() => { ignoreNextBlur.current = false; }, 2000);
         }
     };
 
@@ -174,9 +180,7 @@ const ExamPage = () => {
     const calculateScore = () => {
         let score = 0;
         examData.questions.forEach((q, index) => {
-            if (q.type !== 'subjective' && answers[index] === q.correctOption) {
-                score += 1;
-            }
+            if (q.type !== 'subjective' && answers[index] === q.correctOption) score += 1;
         });
         return score;
     };
@@ -198,8 +202,6 @@ const ExamPage = () => {
         setIsSubmitting(true);
         try {
             const score = calculateScore();
-
-            // Build combined answers object with both MCQ choices and text answers
             const combinedAnswers = {};
             examData.questions.forEach((q, index) => {
                 if (q.type === 'subjective') {
@@ -208,40 +210,32 @@ const ExamPage = () => {
                     combinedAnswers[index] = { type: 'mcq', selected: answers[index] };
                 }
             });
-
-            await api.post('/exam/submit', {
-                examId: examData.examId,
-                answers: combinedAnswers,
-                score
-            });
+            await api.post('/exam/submit', { examId: examData.examId, answers: combinedAnswers, score });
             setIsSubmitted(true);
-            if (streamRef.current) {
-                streamRef.current.getTracks().forEach(t => t.stop());
-                streamRef.current = null;
-            }
+            if (streamRef.current) { streamRef.current.getTracks().forEach(t => { t.stop(); }); streamRef.current = null; }
             if (window.electronAPI) window.electronAPI.deactivateLock();
             if (removeFocusListenerRef.current) removeFocusListenerRef.current();
         } catch (err) {
-            alert('Failed to submit exam');
+            addToast('Failed to submit exam', 'error');
             setIsSubmitting(false);
         }
     };
+
+
 
     if (!examData) return null;
 
     if (isSubmitted) {
         return (
-            <div className="min-h-screen bg-[#f0f7ff] flex items-center justify-center p-4 font-inter">
-                <div className="bg-white p-12 rounded-2xl text-center shadow-xl border border-slate-100 max-w-lg w-full">
-                    <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-8">
-                        <CheckCircle2 size={40} className="text-green-600" />
+            <div style={{ backgroundColor: 'var(--bg-primary)' }} className="min-h-screen flex items-center justify-center p-4 font-inter">
+                <ToastOverlay toasts={toasts} removeToast={removeToast} />
+                <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="p-12 rounded-xl text-center shadow-sm border max-w-lg w-full">
+                    <div style={{ backgroundColor: 'var(--success-light)' }} className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-8">
+                        <CheckCircle2 size={40} style={{ color: 'var(--success-color)' }} />
                     </div>
-                    <h2 className="text-3xl font-bold text-slate-900 mb-4">Assessment Complete</h2>
-                    <p className="text-slate-500 mb-10 leading-relaxed font-medium">Your responses have been successfully recorded. Results will be released by your instructor.</p>
-                    <button
-                        onClick={() => window.electronAPI ? window.close() : navigate('/')}
-                        className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-slate-200"
-                    >
+                    <h2 style={{ color: 'var(--text-primary)' }} className="text-2xl font-bold mb-4">Assessment Complete</h2>
+                    <p style={{ color: 'var(--text-secondary)' }} className="mb-10 leading-relaxed font-medium text-sm">Your responses have been successfully recorded. Results will be released by your instructor.</p>
+                    <button onClick={() => window.electronAPI ? window.close() : navigate('/')} className="btn btn-primary w-full py-3">
                         Return to Dashboard
                     </button>
                 </div>
@@ -251,30 +245,28 @@ const ExamPage = () => {
 
     if (!hasStarted) {
         return (
-            <div className="min-h-screen bg-[#f0f7ff] flex items-center justify-center p-4 font-inter">
-                <div className="bg-white p-12 rounded-2xl text-center shadow-xl border border-slate-100 max-w-lg w-full">
-                    <div className="bg-blue-600 p-4 rounded-2xl text-white w-fit mx-auto mb-8 shadow-lg shadow-blue-200">
+            <div style={{ backgroundColor: 'var(--bg-primary)' }} className="min-h-screen flex items-center justify-center p-4 font-inter">
+                <ToastOverlay toasts={toasts} removeToast={removeToast} />
+                <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="p-12 rounded-xl text-center shadow-sm border max-w-lg w-full">
+                    <div style={{ backgroundColor: 'var(--accent-color)' }} className="p-4 rounded-xl text-white w-fit mx-auto mb-8 shadow-sm">
                         <ShieldCheck size={36} />
                     </div>
-                    <h2 className="text-2xl font-bold text-slate-800 mb-2">{examData.title}</h2>
-                    <p className="text-slate-500 mb-10 font-medium">Ready to begin your secure assessment?</p>
+                    <h2 style={{ color: 'var(--text-primary)' }} className="text-2xl font-bold mb-2">{examData.title}</h2>
+                    <p style={{ color: 'var(--text-secondary)' }} className="mb-10 font-medium text-sm">Ready to begin your secure assessment?</p>
 
-                    <div className="text-left bg-slate-50 p-6 rounded-xl mb-10 border border-slate-100">
-                        <h4 className="text-slate-900 font-bold mb-4 flex items-center text-sm uppercase tracking-wider">
-                            <Info size={16} className="mr-2 text-blue-600" />
+                    <div style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)' }} className="text-left p-6 rounded-xl mb-10 border">
+                        <h4 style={{ color: 'var(--text-primary)' }} className="font-semibold mb-4 flex items-center text-sm uppercase tracking-wider">
+                            <Info size={16} className="mr-2" style={{ color: 'var(--accent-color)' }} />
                             Security Protocol
                         </h4>
-                        <ul className="text-slate-500 text-sm space-y-3 font-medium">
-                            <li className="flex items-start"><ChevronRight size={14} className="mr-2 mt-1 text-blue-600 shrink-0" /> Fullscreen mode will be activated</li>
-                            <li className="flex items-start"><ChevronRight size={14} className="mr-2 mt-1 text-blue-600 shrink-0" /> Background applications will be hindered</li>
-                            <li className="flex items-start"><ChevronRight size={14} className="mr-2 mt-1 text-blue-600 shrink-0" /> Copy/paste and system shortcuts disabled</li>
+                        <ul style={{ color: 'var(--text-secondary)' }} className="text-sm space-y-3 font-medium">
+                            <li className="flex items-start"><ChevronRight size={14} className="mr-2 mt-1 shrink-0" style={{ color: 'var(--accent-color)' }} /> Fullscreen mode will be activated</li>
+                            <li className="flex items-start"><ChevronRight size={14} className="mr-2 mt-1 shrink-0" style={{ color: 'var(--accent-color)' }} /> Background applications will be hindered</li>
+                            <li className="flex items-start"><ChevronRight size={14} className="mr-2 mt-1 shrink-0" style={{ color: 'var(--accent-color)' }} /> Copy/paste and system shortcuts disabled</li>
                         </ul>
                     </div>
 
-                    <button
-                        onClick={handleStartExam}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-5 rounded-xl transition-all shadow-lg shadow-blue-200 flex items-center justify-center space-x-3 active:scale-[0.98]"
-                    >
+                    <button onClick={handleStartExam} className="btn btn-primary w-full py-4 text-base">
                         <PlayCircle size={22} />
                         <span>Start Assessment</span>
                     </button>
@@ -284,27 +276,28 @@ const ExamPage = () => {
     }
 
     return (
-        <div className="flex flex-col h-screen bg-[#f0f7ff] font-inter">
-            {/* Top Bar */}
-            <div className="bg-white px-8 py-4 flex justify-between items-center shadow-sm border-b border-slate-100 shrink-0">
-                <div className="flex items-center space-x-4">
-                    <h1 className="text-lg font-bold text-slate-800">{examData.title}</h1>
-                    <span className="text-xs bg-slate-100 px-3 py-1 rounded-full text-slate-500 font-bold uppercase tracking-wider">Assessment In Progress</span>
-                </div>
+        <div style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }} className="flex flex-col h-screen font-inter">
+            <ToastOverlay toasts={toasts} removeToast={removeToast} />
 
+            {/* Top Bar */}
+            <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="px-8 py-4 flex justify-between items-center shadow-sm border-b shrink-0">
+                <div className="flex items-center space-x-4">
+                    <h1 style={{ color: 'var(--text-primary)' }} className="text-lg font-semibold">{examData.title}</h1>
+                    <span style={{ backgroundColor: 'var(--accent-light)', color: 'var(--accent-color)' }} className="text-xs px-3 py-1 rounded-full font-semibold uppercase tracking-wider">Assessment In Progress</span>
+                </div>
                 <div className="flex items-center space-x-8">
-                    <div className="flex items-center space-x-3 text-slate-800 font-black text-2xl">
+                    <div style={{ color: 'var(--text-primary)' }} className="flex items-center space-x-3 font-bold text-2xl">
                         <Timer durationMinutes={examData.duration} onTimeUp={handleSubmit} />
                     </div>
-                    <div className="flex items-center px-4 py-2 bg-blue-50 border border-blue-100 rounded-lg">
-                        <span className="text-xs font-bold text-blue-600 uppercase tracking-widest mr-2">Answered</span>
-                        <span className="font-black text-blue-700">{getAnsweredCount()} / {examData.questions.length}</span>
+                    <div style={{ backgroundColor: 'var(--accent-light)', borderColor: 'var(--accent-color)' }} className="flex items-center px-4 py-2 border rounded-lg">
+                        <span style={{ color: 'var(--accent-color)' }} className="text-xs font-semibold uppercase tracking-widest mr-2">Answered</span>
+                        <span style={{ color: 'var(--accent-color)' }} className="font-bold">{getAnsweredCount()} / {examData.questions.length}</span>
                     </div>
                 </div>
             </div>
 
             <div className="flex flex-1 overflow-hidden">
-                {/* Main Content (Stepper UI) */}
+                {/* Main Content */}
                 <div className="flex-1 overflow-y-auto p-12 flex flex-col items-center">
                     <div className="max-w-3xl w-full pb-32">
                         {examData?.questions && examData.questions.length > 0 && currentIndex >= 0 && currentIndex < examData.questions.length ? (
@@ -317,32 +310,28 @@ const ExamPage = () => {
                                 onTextAnswer={handleTextAnswer}
                             />
                         ) : (
-                            <div className="p-8 text-center text-slate-500">No question available.</div>
+                            <div className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>No question available.</div>
                         )}
 
                         <div className="flex justify-between mt-8">
-                            <button
-                                disabled={currentIndex === 0}
-                                onClick={() => setCurrentIndex(prev => prev - 1)}
-                                className="flex items-center space-x-2 px-6 py-3 bg-white border border-slate-200 text-slate-500 rounded-xl font-bold hover:bg-slate-50 disabled:opacity-30 transition-all"
-                            >
-                                <ChevronLeft size={18} />
-                                <span>Previous</span>
+                            <button disabled={currentIndex === 0} onClick={() => setCurrentIndex(prev => prev - 1)} className="btn btn-ghost">
+                                <ChevronLeft size={18} /><span>Previous</span>
                             </button>
 
                             {currentIndex < examData.questions.length - 1 ? (
-                                <button
-                                    onClick={() => setCurrentIndex(prev => prev + 1)}
-                                    className="flex items-center space-x-2 px-10 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-md shadow-blue-100 transition-all"
-                                >
-                                    <span>Next Question</span>
-                                    <ChevronRight size={18} />
+                                <button onClick={() => setCurrentIndex(prev => prev + 1)} className="btn btn-primary">
+                                    <span>Next Question</span><ChevronRight size={18} />
                                 </button>
                             ) : (
                                 <button
-                                    onClick={() => { if (window.confirm("Submit your answers? This action is final.")) handleSubmit(); }}
+                                    onClick={() => setConfirmModal({
+                                        title: 'Submit Assessment',
+                                        message: 'Submit your answers? This action is final.',
+                                        onConfirm: () => { setConfirmModal(null); handleSubmit(); }
+                                    })}
                                     disabled={isSubmitting}
-                                    className={`px-10 py-3 rounded-xl font-bold transition-all transform active:scale-95 text-white ${isSubmitting ? 'bg-slate-600 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 shadow-md shadow-green-100'}`}
+                                    className={`btn ${isSubmitting ? 'btn-ghost' : 'btn-primary'}`}
+                                    style={!isSubmitting ? { backgroundColor: 'var(--success-color)' } : {}}
                                 >
                                     {isSubmitting ? 'Submitting...' : 'Finish Assessment'}
                                 </button>
@@ -352,43 +341,43 @@ const ExamPage = () => {
                 </div>
 
                 {/* Sidebar Monitoring */}
-                <div className="w-80 bg-white border-l border-slate-100 flex flex-col shrink-0 overflow-hidden shadow-[-4px_0_10px_rgba(0,0,0,0.02)]">
-                    <div className="p-6 border-b border-slate-50">
-                        <h2 className="text-sm font-bold text-slate-800 uppercase tracking-widest flex items-center">
-                            <span className="w-2 h-2 bg-blue-600 rounded-full mr-3 animate-pulse"></span>
+                <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="w-80 border-l flex flex-col shrink-0 overflow-hidden shadow-[-4px_0_10px_rgba(0,0,0,0.02)]">
+                    <div style={{ borderColor: 'var(--border-color)' }} className="p-6 border-b">
+                        <h2 style={{ color: 'var(--text-primary)' }} className="text-sm font-semibold uppercase tracking-widest flex items-center">
+                            <span style={{ backgroundColor: 'var(--accent-color)' }} className="w-2 h-2 rounded-full mr-3 animate-pulse"></span>
                             Live Monitoring
                         </h2>
                     </div>
 
                     <div className="p-6 flex-1 overflow-y-auto space-y-8">
-                        <div className="rounded-2xl border-2 border-slate-100 overflow-hidden shadow-sm bg-slate-50">
+                        <div style={{ borderColor: 'var(--border-color)' }} className="rounded-xl border-2 overflow-hidden shadow-sm">
                             <MonitoringCamera examId={examData.examId} stream={streamRef.current} />
                         </div>
 
                         <div className="space-y-4">
-                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Security Status</h3>
+                            <h3 style={{ color: 'var(--text-muted)' }} className="text-xs font-semibold uppercase tracking-widest">Security Status</h3>
                             <div className="space-y-3">
-                                <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100">
-                                    <span className="text-xs font-bold text-slate-600">Violations</span>
-                                    <span className={`text-xs font-black px-2 py-0.5 rounded-full ${violationCount > 0 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                                <div style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)' }} className="flex justify-between items-center p-3 rounded-lg border">
+                                    <span style={{ color: 'var(--text-secondary)' }} className="text-xs font-semibold">Violations</span>
+                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${violationCount > 0 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
                                         {violationCount}
                                     </span>
                                 </div>
-                                <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100">
-                                    <span className="text-xs font-bold text-slate-600">Window Focus</span>
-                                    <span className="text-[10px] font-black uppercase text-green-600 tracking-tighter">Locked</span>
+                                <div style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)' }} className="flex justify-between items-center p-3 rounded-lg border">
+                                    <span style={{ color: 'var(--text-secondary)' }} className="text-xs font-semibold">Window Focus</span>
+                                    <span style={{ color: 'var(--success-color)' }} className="text-[10px] font-bold uppercase tracking-tighter">Locked</span>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="p-5 bg-blue-50 border border-blue-100 rounded-xl">
-                            <h4 className="text-xs font-bold text-blue-900 mb-2 uppercase tracking-tight">Requirement</h4>
-                            <p className="text-[11px] text-blue-700 leading-relaxed font-medium">Keep your face within range of the camera. Lighting must be adequate.</p>
+                        <div style={{ backgroundColor: 'var(--accent-light)', borderColor: 'var(--accent-color)' }} className="p-5 border rounded-xl">
+                            <h4 style={{ color: 'var(--text-primary)' }} className="text-xs font-semibold mb-2 uppercase tracking-tight">Requirement</h4>
+                            <p style={{ color: 'var(--text-secondary)' }} className="text-[11px] leading-relaxed font-medium">Keep your face within range of the camera. Lighting must be adequate.</p>
                         </div>
                     </div>
 
-                    <div className="p-4 bg-slate-800 text-white shrink-0">
-                        <h3 className="text-xs font-bold text-slate-400 mb-2">Instructions</h3>
+                    <div style={{ backgroundColor: 'var(--nav-bg)' }} className="p-4 text-white shrink-0">
+                        <h3 style={{ color: 'var(--nav-text-muted)' }} className="text-xs font-semibold mb-2">Instructions</h3>
                         <ul className="text-[10px] space-y-1 opacity-70 list-disc pl-3">
                             <li>Face must be visible</li>
                             <li>Adequate lighting</li>
@@ -398,13 +387,42 @@ const ExamPage = () => {
                 </div>
             </div>
 
-
             <ChatBox examId={examData.examId} />
 
             {/* Warning Bar */}
-            <div className="bg-blue-600 text-white px-8 py-2.5 text-center text-xs font-bold tracking-wide italic">
+            <div style={{ backgroundColor: 'var(--accent-color)' }} className="text-white px-8 py-2.5 text-center text-xs font-semibold tracking-wide italic">
                 Notice: Switching tabs, windows, or using shortcuts is strictly prohibited and logged in real-time.
             </div>
+
+            {/* Grant Reattempt Modal */}
+            {showGrantModal && (
+                <div style={{ backgroundColor: 'var(--modal-overlay)' }} className="fixed inset-0 flex items-center justify-center z-[100]" onClick={() => setShowGrantModal(false)}>
+                    <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="rounded-xl p-6 shadow-2xl w-full max-w-sm mx-4 border" onClick={e => e.stopPropagation()}>
+                        <h3 style={{ color: 'var(--text-primary)' }} className="text-lg font-semibold mb-4">Grant Reattempt</h3>
+                        <input autoFocus type="text" value={grantStudentId} onChange={e => setGrantStudentId(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') handleGrantReattempt(); }}
+                            placeholder="Enter Student ID" className="input-field mb-4" />
+                        <div className="flex space-x-3">
+                            <button onClick={() => { setShowGrantModal(false); setGrantStudentId(''); }} className="btn btn-ghost flex-1">Cancel</button>
+                            <button onClick={handleGrantReattempt} className="btn btn-primary flex-1">Submit</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Confirm Modal */}
+            {confirmModal && (
+                <div style={{ backgroundColor: 'var(--modal-overlay)' }} className="fixed inset-0 flex items-center justify-center z-[100]" onClick={() => setConfirmModal(null)}>
+                    <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="rounded-xl p-6 shadow-2xl w-full max-w-sm mx-4 border" onClick={e => e.stopPropagation()}>
+                        <h3 style={{ color: 'var(--text-primary)' }} className="text-lg font-semibold mb-2">{confirmModal.title}</h3>
+                        <p style={{ color: 'var(--text-secondary)' }} className="text-sm mb-6">{confirmModal.message}</p>
+                        <div className="flex space-x-3">
+                            <button onClick={() => setConfirmModal(null)} className="btn btn-ghost flex-1">Cancel</button>
+                            <button onClick={confirmModal.onConfirm} className="btn btn-primary flex-1">Confirm</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
