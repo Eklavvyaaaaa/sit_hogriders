@@ -70,27 +70,63 @@ const initializeGlobalMediaPipe = async () => {
     return globalInitPromise;
 };
 
+// ── RISK ENGINE CONSTANTS ──
+const GRACE_PERIOD_MS = 120000;           // 120s grace period for minor events
+const FRAMES_TO_TRIGGER = 90;             // ~3 seconds at 30fps
+const DECAY_INTERVAL_MS = 30000;          // Risk decays every 30s
+const DECAY_AMOUNT = 3;                   // Points removed per decay tick
+const RISK_LEVELS = {
+    LOW: 'low',           // 0–20
+    MEDIUM: 'medium',     // 21–50
+    HIGH: 'high',         // 51–80
+    CRITICAL: 'critical', // >80
+};
+
+/**
+ * Compute risk level string from a numeric risk score.
+ */
+const getRiskLevel = (score) => {
+    if (score > 80) return RISK_LEVELS.CRITICAL;
+    if (score > 50) return RISK_LEVELS.HIGH;
+    if (score > 20) return RISK_LEVELS.MEDIUM;
+    return RISK_LEVELS.LOW;
+};
+
 export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
     // ── State ──
     const [isMonitoring, setIsMonitoring] = useState(false);
     const [alerts, setAlerts] = useState([]);
+    const [riskScore, setRiskScore] = useState(0);
     const [integrityScore, setIntegrityScore] = useState(100);
+    const [riskLevel, setRiskLevel] = useState(RISK_LEVELS.LOW);
     const [monitoringError, setMonitoringError] = useState(null);
     const [isReady, setIsReady] = useState(false);
-    const [isTerminated, setIsTerminated] = useState(false);
 
-    // ── Refs (survives re-renders, prevents double-init) ──
+    // Backward compat: isTerminated is always false (no auto-terminate)
+    const [isTerminated] = useState(false);
+
+    // ── Refs ──
     const faceLandmarkerRef = useRef(null);
     const videoRef = useRef(null);
     const streamRef = useRef(null);
-    const lastLogTime = useRef(0);
     const onFrameUpdateRef = useRef(onFrameUpdate);
-    const animationFrameRef = useRef(null);     // Stores current RAF ID
-    const isLoopRunningRef = useRef(false);     // Lock: prevents duplicate detection loops
-    const fatalErrorRef = useRef(false);        // Kill switch: stops loop after fatal crash
-    const consecutiveErrorsRef = useRef(0);     // Tracks repeated detection failures
-    const isTerminatedRef = useRef(false);
+    const animationFrameRef = useRef(null);
+    const isLoopRunningRef = useRef(false);
+    const fatalErrorRef = useRef(false);
+    const consecutiveErrorsRef = useRef(0);
     const alertsRef = useRef([]);
+    const riskScoreRef = useRef(0);
+    const examStartTimeRef = useRef(null);
+    const decayIntervalRef = useRef(null);
+    const lastCleanFrameTimeRef = useRef(null);
+
+    // Duration tracking refs
+    const noFaceStartRef = useRef(null);
+    const multiFaceStartRef = useRef(null);
+    const blurStartRef = useRef(null);
+
+    // Per-event-type throttle (prevents log flooding)
+    const lastLogTimeByType = useRef({});
 
     // Keep callback ref in sync without triggering re-renders
     useEffect(() => {
@@ -126,100 +162,142 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
             isMounted = false;
             log('Cleanup', 'Component unmounting — releasing resources');
 
-            // Cancel any running detection loop
             if (animationFrameRef.current) {
                 cancelAnimationFrame(animationFrameRef.current);
                 animationFrameRef.current = null;
             }
             isLoopRunningRef.current = false;
 
-            // Stop camera stream
             if (streamRef.current) {
                 streamRef.current.getTracks().forEach(track => track.stop());
                 streamRef.current = null;
             }
 
-            // We no longer call landmarker.close() here because the model is globally cached.
-            // Closing it would break the exam if the user navigates away and comes back.
-            faceLandmarkerRef.current = null;
+            if (decayIntervalRef.current) {
+                clearInterval(decayIntervalRef.current);
+                decayIntervalRef.current = null;
+            }
 
+            faceLandmarkerRef.current = null;
             setIsReady(false);
             log('Cleanup', 'Component cleanup finished ✓');
         };
-    }, []); // Empty deps — runs exactly once
+    }, []);
 
     // ══════════════════════════════════════════════════════
-    // 2. THROTTLED EVENT LOGGER & TERMINATION
+    // 2. RISK ENGINE — Accumulation, Decay, Escalation
     // ══════════════════════════════════════════════════════
     const stopMonitoring = useCallback(() => {
         log('Stop', 'stopMonitoring called');
         setIsMonitoring(false);
 
-        // Stop detection loop
         isLoopRunningRef.current = false;
         if (animationFrameRef.current) {
             cancelAnimationFrame(animationFrameRef.current);
             animationFrameRef.current = null;
         }
 
-        // Release camera
         if (streamRef.current) {
             streamRef.current.getTracks().forEach(track => track.stop());
             streamRef.current = null;
         }
+
+        if (decayIntervalRef.current) {
+            clearInterval(decayIntervalRef.current);
+            decayIntervalRef.current = null;
+        }
     }, []);
 
-    const sendLog = useCallback(async (eventType, confidence = 1.0) => {
-        if (isTerminatedRef.current) return;
-
+    /**
+     * Core risk accumulation function.
+     * Adds weighted risk points and handles grace period, escalation, and logging.
+     */
+    const addRisk = useCallback((weight, eventType, confidence = 1.0) => {
         const now = Date.now();
-        if (now - lastLogTime.current < 5000) return;
+        const examStart = examStartTimeRef.current || now;
+        const elapsed = now - examStart;
 
-        lastLogTime.current = now;
+        // ── Grace Period: ignore minor events (<= 5 weight) in first 120s ──
+        const isMinor = weight <= 5;
+        if (isMinor && elapsed < GRACE_PERIOD_MS) {
+            log('Risk', `Grace period active — ignoring minor event: ${eventType}`);
+            return;
+        }
 
-        const newAlert = { time: new Date(), type: eventType, confidence };
+        // ── Per-event-type throttle (3s between same event type) ──
+        const lastTime = lastLogTimeByType.current[eventType] || 0;
+        if (now - lastTime < 3000) return;
+        lastLogTimeByType.current[eventType] = now;
+
+        // ── Accumulate risk ──
+        const newRisk = Math.min(100, riskScoreRef.current + weight);
+        riskScoreRef.current = newRisk;
+        setRiskScore(newRisk);
+        setIntegrityScore(Math.max(0, 100 - newRisk));
+
+        const level = getRiskLevel(newRisk);
+        setRiskLevel(level);
+
+        // ── Create alert entry ──
+        const newAlert = { time: new Date(), type: eventType, confidence, weight, riskAfter: newRisk };
         const updatedAlerts = [...alertsRef.current, newAlert];
-
-        // Optimistically update ref to prevent race conditions before component re-renders
         alertsRef.current = updatedAlerts;
         setAlerts(updatedAlerts);
 
-        if (updatedAlerts.length >= 10 && !isTerminatedRef.current) {
-            isTerminatedRef.current = true;
-            setIsTerminated(true);
-            stopMonitoring();
-            api.post('/monitor/terminate', { examId })
-                .then(() => {
-                    window.location.href = `/last-chance?examId=${examId}`;
-                })
-                .catch(e => err('Terminate', 'API Error:', e.message));
+        log('Risk', `+${weight} [${eventType}] → riskScore=${newRisk} (${level})`);
+
+        // ── Risk Escalation Events ──
+        if (level === RISK_LEVELS.CRITICAL) {
+            log('Risk', '🔴 CRITICAL RISK — flagging for review');
+            api.post('/monitor/log', {
+                examId, eventType: `CRITICAL_RISK: ${eventType}`,
+                confidence, severity: 'critical'
+            }).catch(e => err('Risk', 'Failed to send critical risk:', e.message));
+        } else if (level === RISK_LEVELS.HIGH) {
+            log('Risk', '🟠 HIGH RISK — notifying server');
+            api.post('/monitor/log', {
+                examId, eventType: `HIGH_RISK: ${eventType}`,
+                confidence, severity: 'high'
+            }).catch(e => err('Risk', 'Failed to send high risk:', e.message));
+        } else {
+            // Standard log for medium/low events
+            api.post('/monitor/log', {
+                examId, eventType, confidence, severity: level
+            }).catch(e => err('Log', 'Failed to send log:', e.message));
         }
-
-        if (isTerminatedRef.current) return;
-
-        setIntegrityScore(prev => {
-            let deduction = 0;
-            if (eventType.includes('No face')) deduction = 20;
-            else if (eventType.includes('Multiple faces')) deduction = 40;
-            else if (eventType.includes('Extreme head rotation')) deduction = 10;
-            else if (eventType.includes('Looking away')) deduction = 5;
-            return Math.max(0, prev - deduction);
-        });
-
-        try {
-            await api.post('/monitor/log', { examId, eventType, confidence });
-        } catch (e) {
-            err('Log', 'Failed to send log to API:', e.message);
-        }
-    }, [examId, stopMonitoring]);
+    }, [examId]);
 
     // ══════════════════════════════════════════════════════
-    // 3. DETECTION LOOP (RAF-based, crash-proof)
+    // 3. RISK DECAY TIMER
+    // ══════════════════════════════════════════════════════
+    useEffect(() => {
+        if (!isMonitoring) return;
+
+        decayIntervalRef.current = setInterval(() => {
+            if (riskScoreRef.current > 0) {
+                const decayed = Math.max(0, riskScoreRef.current - DECAY_AMOUNT);
+                riskScoreRef.current = decayed;
+                setRiskScore(decayed);
+                setIntegrityScore(Math.max(0, 100 - decayed));
+                setRiskLevel(getRiskLevel(decayed));
+                log('Decay', `Risk decayed → ${decayed}`);
+            }
+        }, DECAY_INTERVAL_MS);
+
+        return () => {
+            if (decayIntervalRef.current) {
+                clearInterval(decayIntervalRef.current);
+                decayIntervalRef.current = null;
+            }
+        };
+    }, [isMonitoring]);
+
+    // ══════════════════════════════════════════════════════
+    // 4. DETECTION LOOP (RAF-based, crash-proof)
     // ══════════════════════════════════════════════════════
     useEffect(() => {
         if (!isMonitoring || !isReady) return;
 
-        // Guard: Prevent duplicate loops
         if (isLoopRunningRef.current) {
             warn('Loop', 'Detection loop already running — skipping duplicate.');
             return;
@@ -229,12 +307,10 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
         fatalErrorRef.current = false;
         consecutiveErrorsRef.current = 0;
         let suspiciousFrameCount = 0;
-        const framesToTriggerAlert = 20;
 
-        log('Loop', 'Detection loop started ✓');
+        log('Loop', 'Detection loop started ✓ (risk-based model)');
 
         const detectFaces = () => {
-            // Kill switch: stop loop if fatal error occurred
             if (fatalErrorRef.current || !isLoopRunningRef.current) {
                 log('Loop', 'Loop terminated (fatal error or cleanup).');
                 return;
@@ -243,29 +319,64 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
             const video = videoRef.current;
             const landmarker = faceLandmarkerRef.current;
 
-            // Triple guard: landmarker + video + readyState
             if (!landmarker || !video || video.readyState < 2) {
                 animationFrameRef.current = requestAnimationFrame(detectFaces);
                 return;
             }
 
+            const now = Date.now();
+
             try {
                 const results = landmarker.detectForVideo(video, performance.now());
-                consecutiveErrorsRef.current = 0; // Reset on success
+                consecutiveErrorsRef.current = 0;
 
                 if (results.faceLandmarks) {
+                    // ── NO FACE DETECTED ──
                     if (results.faceLandmarks.length === 0) {
-                        sendLog('No face detected');
+                        // Start tracking face-missing duration
+                        if (!noFaceStartRef.current) {
+                            noFaceStartRef.current = now;
+                        }
+                        const missingDuration = (now - noFaceStartRef.current) / 1000;
+
+                        if (missingDuration >= 5) {
+                            addRisk(10, 'Face missing >5s');
+                        } else if (missingDuration >= 2) {
+                            addRisk(5, 'Face missing 2-5s');
+                        }
+                        // <2s → intentionally ignored
+
+                        // Reset multi-face tracker
+                        multiFaceStartRef.current = null;
                         suspiciousFrameCount = 0;
                         if (onFrameUpdateRef.current) onFrameUpdateRef.current(null);
+
+                        // ── MULTIPLE FACES ──
                     } else if (results.faceLandmarks.length > 1) {
-                        sendLog('Multiple faces detected');
+                        // Reset no-face tracker
+                        noFaceStartRef.current = null;
+
+                        if (!multiFaceStartRef.current) {
+                            multiFaceStartRef.current = now;
+                        }
+                        const multiFaceDuration = (now - multiFaceStartRef.current) / 1000;
+
+                        if (multiFaceDuration >= 2) {
+                            addRisk(15, 'Multiple faces detected >2s');
+                        }
+
                         suspiciousFrameCount = 0;
                         if (onFrameUpdateRef.current) onFrameUpdateRef.current(null);
+
+                        // ── SINGLE FACE (normal path) ──
                     } else {
+                        // Reset duration trackers when face is back to normal
+                        noFaceStartRef.current = null;
+                        multiFaceStartRef.current = null;
+
                         const face = results.faceLandmarks[0];
 
-                        // 3D head pose approximation
+                        // 3D head pose approximation (unchanged)
                         const nose = face[1];
                         const forehead = face[10];
                         const chin = face[152];
@@ -280,7 +391,7 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
                         const yawDeviation = Math.abs(nose.x - earMidpointX);
                         const pitchDeviation = Math.abs(nose.y - verticalMidpointY);
 
-                        // Eye gaze via blendshapes
+                        // Eye gaze via blendshapes (unchanged)
                         const blendshapes = results.faceBlendshapes?.[0]?.categories || [];
                         const getScore = (name) => blendshapes.find(b => b.categoryName === name)?.score || 0;
 
@@ -297,7 +408,9 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
 
                         if (isHeadTurned || isLookingAway) {
                             suspiciousFrameCount++;
-                            if (suspiciousFrameCount >= framesToTriggerAlert) {
+
+                            // ── Sustained detection: 90 frames (~3s) ──
+                            if (suspiciousFrameCount >= FRAMES_TO_TRIGGER) {
                                 const confidenceScore = parseFloat((
                                     (Math.min(yawDeviation / yawThreshold, 1.0) * 0.4) +
                                     (Math.min(pitchDeviation / pitchThreshold, 1.0) * 0.4) +
@@ -305,9 +418,11 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
                                 ).toFixed(2));
 
                                 if (isExtremeRotation) {
-                                    sendLog('Extreme head rotation detected', confidenceScore);
+                                    addRisk(8, 'Extreme head rotation detected', confidenceScore);
+                                } else if (isHeadTurned) {
+                                    addRisk(4, 'Sustained head turn detected', confidenceScore);
                                 } else {
-                                    sendLog('Looking away detected', confidenceScore);
+                                    addRisk(2, 'Minor gaze deviation detected', confidenceScore);
                                 }
                                 suspiciousFrameCount = 0;
                             }
@@ -315,7 +430,7 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
                             suspiciousFrameCount = 0;
                         }
 
-                        // Bounding box for canvas overlay
+                        // Bounding box for canvas overlay (unchanged)
                         if (onFrameUpdateRef.current) {
                             let minX = 1, minY = 1, maxX = 0, maxY = 0;
                             for (const pt of face) {
@@ -336,25 +451,21 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
                 consecutiveErrorsRef.current++;
                 err('Loop', `Detection error (${consecutiveErrorsRef.current}/5):`, detectErr.message);
 
-                // After 5 consecutive errors, assume WASM/WebGL is dead — stop loop
                 if (consecutiveErrorsRef.current >= 5) {
-                    err('Loop', 'FATAL: 5 consecutive detection errors. Killing loop to prevent renderer crash.');
+                    err('Loop', 'FATAL: 5 consecutive detection errors. Killing loop.');
                     fatalErrorRef.current = true;
                     setMonitoringError('AI monitoring encountered a fatal error and was disabled to protect the exam.');
-                    return; // Do NOT schedule another frame
+                    return;
                 }
             }
 
-            // Schedule next frame (only if not killed)
             if (!fatalErrorRef.current) {
                 animationFrameRef.current = requestAnimationFrame(detectFaces);
             }
         };
 
-        // Kick off the loop
         animationFrameRef.current = requestAnimationFrame(detectFaces);
 
-        // Cleanup when deps change or component unmounts
         return () => {
             log('Loop', 'Stopping detection loop');
             isLoopRunningRef.current = false;
@@ -363,54 +474,76 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
                 animationFrameRef.current = null;
             }
         };
-    }, [isMonitoring, isReady, sendLog]);
+    }, [isMonitoring, isReady, addRisk, options]);
 
     // ══════════════════════════════════════════════════════
-    // 4. WINDOW BLUR DETECTION
+    // 5. WINDOW BLUR DETECTION (duration-aware)
     // ══════════════════════════════════════════════════════
     useEffect(() => {
         if (!isMonitoring) return;
 
         const handleBlur = () => {
-            sendLog('Window blur / loss of focus detected');
+            blurStartRef.current = Date.now();
+            log('Blur', 'Window lost focus');
         };
 
-        let dispose = null;
+        const handleFocus = () => {
+            if (!blurStartRef.current) return;
+            const blurDuration = (Date.now() - blurStartRef.current) / 1000;
+            blurStartRef.current = null;
+
+            if (blurDuration > 3) {
+                addRisk(12, `Window blur >3s (${blurDuration.toFixed(1)}s)`);
+            } else if (blurDuration >= 0.5) {
+                // Only log blurs longer than 0.5s to avoid accidental clicks
+                addRisk(5, `Window blur <3s (${blurDuration.toFixed(1)}s)`);
+            }
+        };
+
+        let disposeBlur = null;
+        let disposeFocus = null;
+
         try {
             if (window.electronAPI && typeof window.electronAPI.onWindowBlur === 'function') {
-                dispose = window.electronAPI.onWindowBlur(handleBlur);
+                disposeBlur = window.electronAPI.onWindowBlur(handleBlur);
+                // Try to listen for focus restore
+                if (typeof window.electronAPI.onWindowFocus === 'function') {
+                    disposeFocus = window.electronAPI.onWindowFocus(handleFocus);
+                } else {
+                    window.addEventListener('focus', handleFocus);
+                }
             } else if (window.electronAPI && typeof window.electronAPI.onFocusLost === 'function') {
-                dispose = window.electronAPI.onFocusLost(handleBlur);
+                disposeBlur = window.electronAPI.onFocusLost(handleBlur);
+                window.addEventListener('focus', handleFocus);
             } else {
                 window.addEventListener('blur', handleBlur);
+                window.addEventListener('focus', handleFocus);
             }
         } catch (e) {
             warn('Blur', 'Failed to attach blur listener:', e.message);
             window.addEventListener('blur', handleBlur);
+            window.addEventListener('focus', handleFocus);
         }
 
         return () => {
-            if (typeof dispose === 'function') {
-                dispose();
-            } else {
-                window.removeEventListener('blur', handleBlur);
-            }
+            if (typeof disposeBlur === 'function') disposeBlur();
+            else window.removeEventListener('blur', handleBlur);
+
+            if (typeof disposeFocus === 'function') disposeFocus();
+            else window.removeEventListener('focus', handleFocus);
         };
-    }, [isMonitoring, sendLog]);
+    }, [isMonitoring, addRisk]);
 
     // ══════════════════════════════════════════════════════
-    // 5. PUBLIC API
+    // 6. PUBLIC API
     // ══════════════════════════════════════════════════════
     const startMonitoring = useCallback(async (videoElement, existingStream = null) => {
         videoRef.current = videoElement;
+        examStartTimeRef.current = Date.now();
         log('Camera', 'Requesting camera access...');
 
         try {
             const stream = existingStream || await navigator.mediaDevices.getUserMedia({ video: true });
-            if (isTerminatedRef.current) {
-                stream.getTracks().forEach(track => track.stop());
-                return;
-            }
             videoElement.srcObject = stream;
             streamRef.current = stream;
             log('Camera', 'Camera stream started ✓');
@@ -426,18 +559,20 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
             }
         } catch (camErr) {
             err('Camera', 'getUserMedia failed:', camErr.message);
-            sendLog('Camera access denied');
+            addRisk(5, 'Camera access denied');
             setMonitoringError('Camera access denied or unavailable. Monitoring disabled.');
         }
-    }, [sendLog]);
+    }, [addRisk]);
 
     return {
         startMonitoring,
         stopMonitoring,
         alerts,
         integrityScore,
+        riskScore,
+        riskLevel,
         isReady,
         monitoringError,
-        isTerminated
+        isTerminated,  // Always false — backward compat
     };
 };

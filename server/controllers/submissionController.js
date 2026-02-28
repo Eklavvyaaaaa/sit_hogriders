@@ -301,6 +301,7 @@ async function calculateScores(client, submission_id, exam_id) {
   );
 
   let totalATI = 0;
+  let totalContent = 0;
   let answerCount = 0;
 
   for (const ans of answersResult.rows) {
@@ -351,16 +352,24 @@ async function calculateScores(client, submission_id, exam_id) {
     );
 
     totalATI += atiResult.ati_score;
+    totalContent += atiResult.content_score;
     answerCount++;
   }
 
-  const avgATI = answerCount > 0 ? totalATI / answerCount : 0;
+  // ── Final Score = Pure Academic Content Score ──
+  // ATI is stored for proctoring review but does NOT reduce the academic grade.
+  const avgContent = answerCount > 0 ? Math.round((totalContent / answerCount) * 100) / 100 : 0;
+  const avgATI = answerCount > 0 ? Math.round((totalATI / answerCount) * 100) / 100 : 0;
+
+  // Trust factor is informational only (based on ATI), never applied to grade
   const trustFactor = avgATI >= 80 ? 1.0 : avgATI >= 55 ? 0.85 : 0.6;
-  const finalScore = avgATI * trustFactor;
+
+  // Final score = content score (academic merit only)
+  const finalScore = avgContent;
 
   await client.query(
     `INSERT INTO final_grades (submission_id, base_score, trust_factor, final_score)
      VALUES ($1, $2, $3, $4) ON CONFLICT (submission_id) DO UPDATE SET base_score = $2, trust_factor = $3, final_score = $4`,
-    [submission_id, avgATI, trustFactor, finalScore]
+    [submission_id, avgContent, trustFactor, finalScore]
   );
 }
