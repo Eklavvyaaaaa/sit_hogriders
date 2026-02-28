@@ -279,11 +279,25 @@ const TeacherDashboard = () => {
                                                 <div className="flex items-start justify-between mb-3">
                                                     <div className="flex-1 min-w-0 mr-3">
                                                         <h3 className="text-lg font-black text-slate-900 truncate tracking-tight group-hover:text-blue-700 transition-colors" title={exam.title}>{exam.title}</h3>
-                                                        <div className="flex items-center space-x-2 mt-1.5">
+                                                        <div className="flex items-center flex-wrap gap-2 mt-2">
                                                             <span className={`inline-flex items-center space-x-1.5 text-[9px] px-2 py-0.5 rounded-full border font-black uppercase tracking-widest ${statusBadge.bg}`}>
                                                                 <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dot}`}></span>
                                                                 <span>{exam.status || 'scheduled'}</span>
                                                             </span>
+                                                            {exam.exam_code && (
+                                                                <div className="inline-flex items-center bg-blue-50 border border-blue-200 rounded-lg pl-2 pr-1 py-1">
+                                                                    <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest mr-2 leading-none">Class Code:</span>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="text-blue-700 font-mono font-bold text-sm tracking-widest cursor-pointer hover:text-blue-900 transition-colors flex items-center leading-none"
+                                                                        onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(exam.exam_code).then(() => alert('Class code copied!')) }}
+                                                                        title="Click to copy class code"
+                                                                    >
+                                                                        <span>{exam.exam_code}</span>
+                                                                        <Copy size={12} className="ml-1 opacity-70" />
+                                                                    </button>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
 
@@ -330,20 +344,9 @@ const TeacherDashboard = () => {
                                                 </div>
 
                                                 {/* Meta Info */}
-                                                <div className="flex items-center flex-wrap gap-2 text-xs text-slate-500 font-medium">
+                                                <div className="flex items-center flex-wrap gap-2 text-xs text-slate-500 font-medium mt-3">
                                                     <span className="bg-slate-50 border border-slate-100 px-2 py-1 rounded-md text-[11px]"><Clock size={11} className="inline mr-1 -mt-px text-slate-400" />{exam.duration} min</span>
                                                     <span className="bg-slate-50 border border-slate-100 px-2 py-1 rounded-md font-mono text-[11px]">ID: {exam.id}</span>
-                                                    {exam.exam_code && (
-                                                        <button
-                                                            type="button"
-                                                            className="bg-blue-50 text-blue-600 border border-blue-100 px-2 py-1 rounded-md font-mono text-[11px] cursor-pointer hover:bg-blue-100 transition-colors flex items-center space-x-1"
-                                                            onClick={() => navigator.clipboard.writeText(exam.exam_code).then(() => alert('Exam code copied!')).catch((err) => { console.error('Copy failed', err); alert('Failed to copy. Code: ' + exam.exam_code); })}
-                                                            title="Click to copy exam code"
-                                                        >
-                                                            <Copy size={11} />
-                                                            <span>{exam.exam_code}</span>
-                                                        </button>
-                                                    )}
                                                 </div>
                                             </div>
 
