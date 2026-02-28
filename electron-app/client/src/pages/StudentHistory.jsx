@@ -84,13 +84,13 @@ const StudentHistory = () => {
     }, [history, sortField, sortOrder, statusFilter]);
 
     return (
-        <div className="min-h-screen bg-white flex flex-col font-inter">
+        <div style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }} className="min-h-screen flex flex-col font-inter transition-colors duration-200">
             <Navbar />
             <div className="flex-1 max-w-5xl w-full mx-auto p-8">
                 <div className="mb-8">
-                    <p className="text-[11px] font-black text-blue-600 uppercase tracking-widest mb-1">Student Portal</p>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tighter mb-1">Exam History</h1>
-                    <p className="text-slate-500 text-sm font-medium">View your past exam results and detailed scores.</p>
+                    <p style={{ color: 'var(--accent-color)' }} className="text-[11px] font-black uppercase tracking-widest mb-1">Student Portal</p>
+                    <h1 style={{ color: 'var(--text-primary)' }} className="text-3xl font-black tracking-tighter mb-1">Exam History</h1>
+                    <p style={{ color: 'var(--text-secondary)' }} className="text-sm font-medium">View your past exam results and detailed scores.</p>
                 </div>
 
                 {/* Upcoming Exams Section */}
@@ -102,14 +102,14 @@ const StudentHistory = () => {
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                             {upcoming.map(exam => (
-                                <div key={exam.id} className="bg-white rounded-xl p-5 border border-blue-100 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] flex flex-col">
-                                    <h3 className="text-slate-900 font-bold text-sm mb-2">{exam.title}</h3>
-                                    <div className="flex items-center space-x-1 text-slate-500 text-xs mb-1">
-                                        <Clock size={12} className="text-slate-400" />
+                                <div key={exam.id} style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }} className="rounded-xl p-5 border shadow-sm flex flex-col">
+                                    <h3 className="font-bold text-sm mb-2">{exam.title}</h3>
+                                    <div className="flex items-center space-x-1 text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>
+                                        <Clock size={12} style={{ color: 'var(--text-muted)' }} />
                                         <span>{exam.created_at ? new Date(exam.created_at).toLocaleDateString() : '—'}</span>
                                     </div>
-                                    <div className="flex items-center space-x-1 text-slate-500 text-xs mb-3">
-                                        <Timer size={12} className="text-slate-400" />
+                                    <div className="flex items-center space-x-1 text-xs mb-3" style={{ color: 'var(--text-secondary)' }}>
+                                        <Timer size={12} style={{ color: 'var(--text-muted)' }} />
                                         <span>{exam.duration != null ? `${exam.duration} mins` : '—'}</span>
                                     </div>
                                     <div className="mt-auto">
@@ -122,7 +122,7 @@ const StudentHistory = () => {
                                     </div>
                                     <button
                                         onClick={() => navigate(`/join?examId=${exam.id}`)}
-                                        className="mt-3 flex items-center justify-center space-x-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-4 rounded-lg transition-colors"
+                                        className="btn btn-primary mt-3 w-full"
                                     >
                                         <Play size={12} />
                                         <span>Start Exam</span>
@@ -134,13 +134,13 @@ const StudentHistory = () => {
                 )}
 
                 {loading ? (
-                    <div className="text-center py-20 text-slate-400 font-medium">Loading...</div>
+                    <div style={{ color: 'var(--text-muted)' }} className="text-center py-20 font-medium">Loading...</div>
                 ) : error ? (
-                    <div className="text-center py-20 text-red-500 font-medium">Error: {error.message || 'Failed to fetch history'}</div>
+                    <div style={{ color: 'var(--danger-color)' }} className="text-center py-20 font-medium">Error: {error.message || 'Failed to fetch history'}</div>
                 ) : history.length === 0 ? (
-                    <div className="text-center py-20 bg-slate-50 rounded-xl border border-slate-100 border-dashed">
-                        <BookOpen size={48} className="mx-auto text-slate-300 mb-4" />
-                        <p className="text-slate-400 text-lg font-medium">No exams taken yet.</p>
+                    <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="text-center py-20 rounded-xl border border-dashed">
+                        <BookOpen size={48} style={{ color: 'var(--text-muted)' }} className="mx-auto mb-4 opacity-50" />
+                        <p style={{ color: 'var(--text-secondary)' }} className="text-lg font-medium">No exams taken yet.</p>
                         <button
                             onClick={() => navigate('/join')}
                             className="mt-4 text-blue-600 hover:text-blue-700 font-bold"
@@ -159,7 +159,8 @@ const StudentHistory = () => {
                                     aria-label="Sort by field"
                                     value={sortField}
                                     onChange={e => setSortField(e.target.value)}
-                                    className="text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                                    className="text-xs font-semibold rounded-lg px-3 py-1.5 focus:outline-none border border-solid focus:ring-2 focus:ring-[var(--accent-color)]"
                                 >
                                     <option value="date">Sort by Date</option>
                                     <option value="score">Sort by Score</option>
@@ -169,7 +170,8 @@ const StudentHistory = () => {
                                     aria-label="Sort order"
                                     value={sortOrder}
                                     onChange={e => setSortOrder(e.target.value)}
-                                    className="text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                                    className="text-xs font-semibold border border-solid rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
                                 >
                                     <option value="desc">Descending</option>
                                     <option value="asc">Ascending</option>
@@ -182,7 +184,8 @@ const StudentHistory = () => {
                                     aria-label="Filter by status"
                                     value={statusFilter}
                                     onChange={e => setStatusFilter(e.target.value)}
-                                    className="text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                                    className="text-xs border border-solid font-semibold rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
                                 >
                                     <option value="all">All Statuses</option>
                                     <option value="completed">Completed</option>
@@ -192,10 +195,10 @@ const StudentHistory = () => {
                             </div>
                         </div>
 
-                        <div className="bg-white rounded-xl overflow-hidden border border-slate-200 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]">
+                        <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="rounded-xl overflow-hidden border shadow-sm">
                             <table className="w-full text-left">
                                 <thead>
-                                    <tr className="bg-slate-50 text-slate-500 uppercase text-[10px] tracking-widest font-black border-b border-slate-200">
+                                    <tr style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-secondary)', borderColor: 'var(--border-color)' }} className="uppercase text-[10px] tracking-widest font-black border-b">
                                         <th className="p-4">Exam</th>
                                         <th className="p-4">Date</th>
                                         <th className="p-4">Duration</th>
@@ -224,28 +227,28 @@ const StudentHistory = () => {
                                                 }}
                                             >
                                                 <td className="p-4">
-                                                    <span className="text-slate-900 font-semibold text-sm">{item.exam_title}</span>
+                                                    <span style={{ color: 'var(--text-primary)' }} className="font-semibold text-sm">{item.exam_title}</span>
                                                 </td>
                                                 <td className="p-4">
-                                                    <span className="flex items-center space-x-1 text-slate-500 text-sm">
-                                                        <Clock size={13} className="text-slate-400" />
+                                                    <span className="flex items-center space-x-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                                        <Clock size={13} style={{ color: 'var(--text-muted)' }} />
                                                         <span>{item.submitted_at ? new Date(item.submitted_at).toLocaleDateString() : 'Not submitted'}</span>
                                                     </span>
                                                 </td>
                                                 <td className="p-4">
-                                                    <span className="flex items-center space-x-1 text-slate-500 text-sm">
-                                                        <Timer size={13} className="text-slate-400" />
+                                                    <span className="flex items-center space-x-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                                        <Timer size={13} style={{ color: 'var(--text-muted)' }} />
                                                         <span>{item.duration != null ? `${item.duration} mins` : '—'}</span>
                                                     </span>
                                                 </td>
                                                 <td className="p-4">
                                                     {item.violation_count > 0 ? (
-                                                        <span className="flex items-center space-x-1 text-orange-600 text-sm font-semibold">
+                                                        <span style={{ color: 'var(--warning-color, #D97706)' }} className="flex items-center space-x-1 text-sm font-semibold">
                                                             <AlertTriangle size={14} />
                                                             <span>{item.violation_count}</span>
                                                         </span>
                                                     ) : (
-                                                        <span className="text-slate-400 text-sm">0</span>
+                                                        <span style={{ color: 'var(--text-muted)' }} className="text-sm">0</span>
                                                     )}
                                                 </td>
                                                 <td className="p-4">

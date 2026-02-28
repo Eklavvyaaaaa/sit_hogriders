@@ -26,8 +26,8 @@ const SubmissionResults = () => {
         fetchDetail();
     }, [submissionId]);
 
-    if (loading) return <div className="min-h-screen bg-white flex items-center justify-center text-slate-500 font-medium">Loading...</div>;
-    if (!data) return <div className="min-h-screen bg-white flex items-center justify-center text-red-500 font-medium">Submission not found</div>;
+    if (loading) return <div style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-muted)' }} className="min-h-screen flex items-center justify-center font-medium">Loading...</div>;
+    if (!data) return <div style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--danger-color)' }} className="min-h-screen flex items-center justify-center font-medium">Submission not found</div>;
 
     const { submission, student, exam, questions, answers, finalGrade } = data;
 
@@ -48,27 +48,28 @@ const SubmissionResults = () => {
     };
 
     return (
-        <div className="min-h-screen bg-white flex flex-col font-inter">
+        <div style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }} className="min-h-screen flex flex-col font-inter transition-colors duration-200">
             <Navbar />
             <div className="flex-1 max-w-5xl w-full mx-auto p-8">
                 <button
                     onClick={() => navigate(user.role === 'teacher' ? '/teacher' : '/history')}
-                    className="flex items-center space-x-2 text-slate-400 hover:text-slate-700 mb-6 transition-colors text-sm font-medium"
+                    style={{ color: 'var(--text-secondary)' }}
+                    className="flex items-center space-x-2 hover:opacity-80 mb-6 transition-opacity text-sm font-medium"
                 >
                     <ArrowLeft size={16} />
                     <span>Back</span>
                 </button>
 
                 {/* Header */}
-                <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] mb-6">
+                <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="rounded-xl p-6 border shadow-sm mb-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-[11px] font-black text-blue-600 uppercase tracking-widest mb-1">Submission Detail</p>
-                            <h1 className="text-2xl font-black text-slate-900 tracking-tight mb-1">{exam.title}</h1>
-                            <p className="text-slate-400 text-sm font-medium">
-                                Student: <span className="text-slate-700 font-semibold">{student.name}</span> ({student.email})
+                            <p style={{ color: 'var(--accent-color)' }} className="text-[11px] font-black uppercase tracking-widest mb-1">Submission Detail</p>
+                            <h1 style={{ color: 'var(--text-primary)' }} className="text-2xl font-black tracking-tight mb-1">{exam.title}</h1>
+                            <p style={{ color: 'var(--text-secondary)' }} className="text-sm font-medium">
+                                Student: <span style={{ color: 'var(--text-primary)' }} className="font-semibold">{student.name}</span> ({student.email})
                             </p>
-                            <p className="text-slate-400 text-sm">
+                            <p style={{ color: 'var(--text-muted)' }} className="text-sm mt-1">
                                 Submitted: {submission.submitted_at ? new Date(submission.submitted_at).toLocaleString() : 'Not submitted'}
                             </p>
                         </div>
@@ -77,8 +78,8 @@ const SubmissionResults = () => {
                                 <div className={`text-4xl font-black ${getScoreColor(finalGrade.final_score)}`}>
                                     {Math.round(finalGrade.final_score)}
                                 </div>
-                                <div className="text-[10px] text-slate-400 uppercase tracking-widest font-black mt-1">Final Score</div>
-                                <div className="flex items-center space-x-3 mt-2 text-xs text-slate-500 font-medium">
+                                <div style={{ color: 'var(--text-muted)' }} className="text-[10px] uppercase tracking-widest font-black mt-1">Final Score</div>
+                                <div style={{ color: 'var(--text-secondary)' }} className="flex items-center space-x-3 mt-2 text-xs font-medium">
                                     <span>Base: {Math.round(finalGrade.base_score)}</span>
                                     <span>Trust: {finalGrade.trust_factor}x</span>
                                 </div>
@@ -90,32 +91,32 @@ const SubmissionResults = () => {
                 {/* Score Overview Cards */}
                 {finalGrade && (
                     <div className="grid grid-cols-4 gap-4 mb-6">
-                        <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] text-center">
-                            <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center mx-auto mb-2">
-                                <Award size={20} className="text-blue-600" />
+                        <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="rounded-xl p-5 border shadow-sm text-center">
+                            <div style={{ backgroundColor: 'var(--accent-light)' }} className="w-10 h-10 rounded-lg flex items-center justify-center mx-auto mb-2">
+                                <Award size={20} style={{ color: 'var(--accent-color)' }} />
                             </div>
-                            <p className="text-2xl font-black text-slate-900">{Math.round(finalGrade.base_score)}</p>
-                            <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black">Base Score</p>
+                            <p style={{ color: 'var(--text-primary)' }} className="text-2xl font-black">{Math.round(finalGrade.base_score)}</p>
+                            <p style={{ color: 'var(--text-muted)' }} className="text-[10px] uppercase tracking-widest font-black">Base Score</p>
                         </div>
-                        <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] text-center">
-                            <div className="w-10 h-10 bg-cyan-50 rounded-lg flex items-center justify-center mx-auto mb-2">
-                                <Shield size={20} className="text-cyan-600" />
+                        <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="rounded-xl p-5 border shadow-sm text-center">
+                            <div style={{ backgroundColor: 'var(--teal-light)' }} className="w-10 h-10 rounded-lg flex items-center justify-center mx-auto mb-2">
+                                <Shield size={20} style={{ color: 'var(--teal-accent)' }} />
                             </div>
-                            <p className="text-2xl font-black text-slate-900">{finalGrade.trust_factor}x</p>
-                            <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black">Trust Factor</p>
+                            <p style={{ color: 'var(--text-primary)' }} className="text-2xl font-black">{finalGrade.trust_factor}x</p>
+                            <p style={{ color: 'var(--text-muted)' }} className="text-[10px] uppercase tracking-widest font-black">Trust Factor</p>
                         </div>
-                        <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] text-center">
-                            <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center mx-auto mb-2">
-                                <Brain size={20} className="text-indigo-600" />
+                        <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="rounded-xl p-5 border shadow-sm text-center">
+                            <div style={{ backgroundColor: 'var(--accent-light)' }} className="w-10 h-10 rounded-lg flex items-center justify-center mx-auto mb-2">
+                                <Brain size={20} style={{ color: 'var(--accent-color)' }} />
                             </div>
                             <p className={`text-2xl font-black ${getScoreColor(finalGrade.final_score)}`}>{Math.round(finalGrade.final_score)}</p>
-                            <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black">Final Score</p>
+                            <p style={{ color: 'var(--text-muted)' }} className="text-[10px] uppercase tracking-widest font-black">Final Score</p>
                         </div>
-                        <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] text-center">
+                        <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="rounded-xl p-5 border shadow-sm text-center">
                             <div className={`w-10 h-10 rounded-lg flex items-center justify-center mx-auto mb-2 ${finalGrade.trust_factor == null ? 'bg-slate-50'
-                                    : finalGrade.trust_factor >= 0.85 ? 'bg-emerald-50'
-                                        : finalGrade.trust_factor >= 0.6 ? 'bg-amber-50'
-                                            : 'bg-red-50'
+                                : finalGrade.trust_factor >= 0.85 ? 'bg-emerald-50'
+                                    : finalGrade.trust_factor >= 0.6 ? 'bg-amber-50'
+                                        : 'bg-red-50'
                                 }`}>
                                 <Shield size={20} className={
                                     finalGrade.trust_factor == null ? 'text-slate-400'
@@ -125,46 +126,47 @@ const SubmissionResults = () => {
                                 } />
                             </div>
                             <p className={`text-2xl font-black ${finalGrade.trust_factor == null ? 'text-slate-400'
-                                    : finalGrade.trust_factor >= 0.85 ? 'text-emerald-600'
-                                        : finalGrade.trust_factor >= 0.6 ? 'text-amber-600'
-                                            : 'text-red-600'
+                                : finalGrade.trust_factor >= 0.85 ? 'text-emerald-600'
+                                    : finalGrade.trust_factor >= 0.6 ? 'text-amber-600'
+                                        : 'text-red-600'
                                 }`}>
                                 {finalGrade.trust_factor == null ? 'N/A'
                                     : finalGrade.trust_factor >= 0.85 ? 'High'
                                         : finalGrade.trust_factor >= 0.6 ? 'Medium'
                                             : 'Low'}
                             </p>
-                            <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black">Trust Band</p>
+                            <p style={{ color: 'var(--text-muted)' }} className="text-[10px] uppercase tracking-widest font-black">Trust Band</p>
                         </div>
                     </div>
                 )}
 
                 {/* Per-Question Breakdown */}
-                <h2 className="text-lg font-black text-slate-900 tracking-tight mb-4">Question-by-Question Breakdown</h2>
+                <h2 style={{ color: 'var(--text-primary)' }} className="text-lg font-black tracking-tight mb-4">Question-by-Question Breakdown</h2>
                 <div className="space-y-4">
                     {questions.map((q, index) => {
                         const answer = answers.find(a => a.question_id === (q.id ?? index));
                         const isSubjective = q.type === 'subjective';
 
                         return (
-                            <div key={index} className="bg-white rounded-xl p-6 border border-slate-200 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]">
+                            <div key={index} style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="rounded-xl p-6 border shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]">
                                 <div className="flex items-start justify-between mb-3">
                                     <div className="flex items-start space-x-3 flex-1">
-                                        <span className="text-blue-600 font-black">Q{index + 1}.</span>
-                                        <span className="text-slate-900 font-medium">{q.text}</span>
+                                        <span style={{ color: 'var(--accent-color)' }} className="font-black">Q{index + 1}.</span>
+                                        <span style={{ color: 'var(--text-primary)' }} className="font-medium">{q.text}</span>
                                     </div>
-                                    <span className={`text-[10px] px-2 py-1 rounded-md border font-black uppercase tracking-widest shrink-0 ml-3 ${isSubjective
-                                        ? 'bg-indigo-50 text-indigo-600 border-indigo-200'
-                                        : 'bg-blue-50 text-blue-600 border-blue-200'
-                                        }`}>
+                                    <span style={{
+                                        backgroundColor: isSubjective ? 'var(--accent-light)' : 'var(--teal-light)',
+                                        color: isSubjective ? 'var(--accent-color)' : 'var(--teal-accent)',
+                                        borderColor: 'var(--border-color)'
+                                    }} className="text-[10px] px-2 py-1 rounded-md border font-black uppercase tracking-widest shrink-0 ml-3">
                                         {isSubjective ? 'Subjective' : 'MCQ'}
                                     </span>
                                 </div>
 
                                 {/* Student's Answer */}
-                                <div className="bg-slate-50 rounded-lg p-4 mb-3 border border-slate-100">
-                                    <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black mb-1">Student's Answer</p>
-                                    <p className="text-slate-700 text-sm">{answer?.answer_text || 'No answer provided'}</p>
+                                <div style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--input-border)' }} className="rounded-lg p-4 mb-3 border">
+                                    <p style={{ color: 'var(--text-muted)' }} className="text-[10px] uppercase tracking-widest font-black mb-1">Student's Answer</p>
+                                    <p style={{ color: 'var(--text-primary)' }} className="text-sm">{answer?.answer_text || 'No answer provided'}</p>
                                 </div>
 
                                 {/* MCQ: show correct answer */}
@@ -184,9 +186,9 @@ const SubmissionResults = () => {
                                 {/* Subjective: show model answer + ATI scores */}
                                 {isSubjective && (
                                     <>
-                                        <div className="bg-blue-50/50 rounded-lg p-4 mb-3 border border-blue-100/50">
-                                            <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black mb-1">Model Answer</p>
-                                            <p className="text-slate-600 text-sm">{q.model_answer}</p>
+                                        <div style={{ backgroundColor: 'var(--accent-light)', borderColor: 'var(--border-color)' }} className="rounded-lg p-4 mb-3 border">
+                                            <p style={{ color: 'var(--text-muted)' }} className="text-[10px] uppercase tracking-widest font-black mb-1">Model Answer</p>
+                                            <p style={{ color: 'var(--text-secondary)' }} className="text-sm">{q.model_answer}</p>
                                         </div>
 
                                         {answer && Number.isFinite(answer.ati_score) && (
@@ -195,7 +197,7 @@ const SubmissionResults = () => {
                                                     <p className={`text-lg font-black ${getScoreColor(answer.semantic_score)}`}>
                                                         {Number.isFinite(answer.semantic_score) ? Math.round(answer.semantic_score * 100) : '-'}%
                                                     </p>
-                                                    <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black">Content</p>
+                                                    <p style={{ color: 'var(--text-muted)' }} className="text-[10px] uppercase tracking-widest font-black">Content</p>
                                                 </div>
                                                 <div className={`rounded-lg p-3 border text-center ${getScoreBg(answer.similarity_score)}`}>
                                                     <p className={`text-lg font-black ${getScoreColor(answer.similarity_score)}`}>
