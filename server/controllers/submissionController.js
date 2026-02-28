@@ -57,6 +57,20 @@ async function finalizeSubmission(submissionId, userId) {
     // Trigger real ATI grading
     await calculateScores(client, submissionId, submission.exam_id);
 
+    // Create a generic notification for the student
+    const eRes = await client.query('SELECT title FROM exams WHERE id = $1', [submission.exam_id]);
+    const examTitle = eRes.rows[0]?.title || 'Assessment';
+    await client.query(`
+      INSERT INTO notifications (user_id, title, message, type, action_url)
+      VALUES ($1, $2, $3, $4, $5)
+    `, [
+      submission.student_id,
+      'Exam Submitted',
+      `Your submission for "${examTitle}" has been successfully recorded and graded.`,
+      'success',
+      '/history'
+    ]);
+
     // Check if all students have submitted for this exam; if so, mark exam completed
     await checkAndCompleteExam(client, submission.exam_id);
 
@@ -67,7 +81,9 @@ async function finalizeSubmission(submissionId, userId) {
         message: isAutoSubmitted
           ? 'Exam auto-submitted (time expired)'
           : 'Exam submitted successfully',
-        autoSubmitted: isAutoSubmitted
+        autoSubmitted: isAutoSubmitted,
+        submissionId: submissionId,
+        examId: submission.exam_id
       }
     };
   } catch (txErr) {

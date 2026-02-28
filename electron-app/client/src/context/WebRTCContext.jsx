@@ -21,6 +21,7 @@ export const WebRTCProvider = ({ children }) => {
     // Internal references to prevent memory leaks across React re-renders
     const peerConnectionsRef = useRef({}); // Map of userId -> RTCPeerConnection
     const localStreamRef = useRef(null);   // Single local stream (Student)
+    const iceCandidateQueue = useRef({});   // Map of userId -> [RTCIceCandidate] for queuing before remoteDescription
 
     // ==========================================
     // Core WebRTC Event Listeners
@@ -66,50 +67,61 @@ export const WebRTCProvider = ({ children }) => {
         const handleWebrtcOffer = async ({ studentId, offer, examId }) => {
             console.log(`[WebRTCContext] Received Offer from student ${studentId}`);
 
-            let pc = peerConnectionsRef.current[studentId];
-            if (!pc) {
-                pc = new RTCPeerConnection(ICE_SERVERS);
-                peerConnectionsRef.current[studentId] = pc;
-
-                pc.ontrack = (event) => {
-                    if (event.streams && event.streams[0]) {
-                        console.log(`[WebRTCContext] Incoming track from ${studentId}`);
-                        setRemoteStreams(prev => ({
-                            ...prev,
-                            [studentId]: event.streams[0]
-                        }));
-                    }
-                };
-
-                pc.oniceconnectionstatechange = () => {
-                    if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
-                        console.log(`[WebRTCContext] Connection lost with ${studentId}`);
-                        pc.close();
-                        delete peerConnectionsRef.current[studentId];
-                        setRemoteStreams(prev => {
-                            const newStreams = { ...prev };
-                            delete newStreams[studentId];
-                            return newStreams;
-                        });
-                    }
-                };
-
-                pc.onicecandidate = (event) => {
-                    if (event.candidate) {
-                        socket.emit('webrtc:ice-candidate', {
-                            targetUserId: studentId,
-                            candidate: event.candidate,
-                            examId
-                        });
-                    }
-                };
+            // Close stale connection before creating a new one
+            let oldPc = peerConnectionsRef.current[studentId];
+            if (oldPc) {
+                oldPc.close();
+                delete peerConnectionsRef.current[studentId];
             }
+
+            const pc = new RTCPeerConnection(ICE_SERVERS);
+            peerConnectionsRef.current[studentId] = pc;
+            iceCandidateQueue.current[studentId] = [];
+
+            pc.ontrack = (event) => {
+                if (event.streams && event.streams[0]) {
+                    console.log(`[WebRTCContext] Incoming track from ${studentId}`);
+                    setRemoteStreams(prev => ({
+                        ...prev,
+                        [studentId]: event.streams[0]
+                    }));
+                }
+            };
+
+            pc.oniceconnectionstatechange = () => {
+                if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+                    console.log(`[WebRTCContext] Connection lost with ${studentId}`);
+                    pc.close();
+                    delete peerConnectionsRef.current[studentId];
+                    setRemoteStreams(prev => {
+                        const newStreams = { ...prev };
+                        delete newStreams[studentId];
+                        return newStreams;
+                    });
+                }
+            };
+
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    socket.emit('webrtc:ice-candidate', {
+                        targetUserId: studentId,
+                        candidate: event.candidate,
+                        examId
+                    });
+                }
+            };
 
             try {
                 await pc.setRemoteDescription(new RTCSessionDescription(offer));
+                // Drain queued ICE candidates
+                const queued = iceCandidateQueue.current[studentId] || [];
+                for (const c of queued) {
+                    await pc.addIceCandidate(new RTCIceCandidate(c));
+                }
+                iceCandidateQueue.current[studentId] = [];
+
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
-
                 socket.emit('webrtc:answer', { targetStudentId: studentId, answer, examId });
             } catch (err) {
                 console.error("Error setting up remote stream:", err);
@@ -123,13 +135,19 @@ export const WebRTCProvider = ({ children }) => {
             if (pc) {
                 try {
                     await pc.setRemoteDescription(new RTCSessionDescription(answer));
+                    // Drain queued ICE candidates for this teacher
+                    const queued = iceCandidateQueue.current[teacherId] || [];
+                    for (const c of queued) {
+                        await pc.addIceCandidate(new RTCIceCandidate(c));
+                    }
+                    iceCandidateQueue.current[teacherId] = [];
                 } catch (err) {
                     console.error("Error setting remote description from answer:", err);
                 }
             }
         };
 
-        // 4. Exchange ICE Candidates
+        // 4. Exchange ICE Candidates (queue if remoteDescription not yet set)
         const handleWebrtcIceCandidate = async ({ senderId, candidate }) => {
             const pc = peerConnectionsRef.current[senderId];
             if (pc && pc.remoteDescription) {
@@ -138,6 +156,12 @@ export const WebRTCProvider = ({ children }) => {
                 } catch (err) {
                     console.error("Error adding remote ICE candidate:", err);
                 }
+            } else {
+                // Queue the candidate until remoteDescription is set
+                if (!iceCandidateQueue.current[senderId]) {
+                    iceCandidateQueue.current[senderId] = [];
+                }
+                iceCandidateQueue.current[senderId].push(candidate);
             }
         };
 

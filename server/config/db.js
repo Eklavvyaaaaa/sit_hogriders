@@ -114,6 +114,17 @@ const initDB = async () => {
         joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(student_id, exam_id)
       );
+
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        type TEXT DEFAULT 'info',
+        is_read BOOLEAN DEFAULT false,
+        action_url TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
     // Run migrations for existing tables (safe to run multiple times)
