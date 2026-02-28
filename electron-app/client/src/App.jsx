@@ -115,6 +115,10 @@ const AppRoutes = () => {
   );
 };
 
+import { SocketProvider } from './context/SocketContext';
+import { ChatProvider } from './context/ChatContext';
+import { WebRTCProvider } from './context/WebRTCContext';
+
 function App() {
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'light';
@@ -123,9 +127,15 @@ function App() {
 
   return (
     <AuthProvider>
-      <Router>
-        <AppRoutes />
-      </Router>
+      <SocketProvider>
+        <ChatProvider>
+          <WebRTCProvider>
+            <Router>
+              <AppRoutes />
+            </Router>
+          </WebRTCProvider>
+        </ChatProvider>
+      </SocketProvider>
     </AuthProvider>
   );
 }
