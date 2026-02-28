@@ -1,54 +1,73 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { LogOut, Bell, User, Shield, History, Home } from 'lucide-react';
+import { LogOut, Bell, User, Shield, History, Home, Sun, Moon } from 'lucide-react';
 
 const Navbar = () => {
     const { user, logout } = useContext(AuthContext);
     const navigate = useNavigate();
     const location = useLocation();
 
+    const [theme, setTheme] = useState(() => {
+        return localStorage.getItem('theme') || 'light';
+    });
+
+    useEffect(() => {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+    }, [theme]);
+
+    const toggleTheme = () => {
+        setTheme(prev => prev === 'light' ? 'dark' : 'light');
+    };
+
     const handleLogout = () => {
         logout();
         navigate('/login');
     };
 
+    const isDark = theme === 'dark';
+
     return (
-        <nav className="bg-white text-slate-800 px-8 py-4 flex justify-between items-center shadow-sm border-b border-slate-100 sticky top-0 z-50">
+        <nav style={{ backgroundColor: 'var(--nav-bg)', borderBottom: '1px solid var(--nav-border)' }}
+            className="px-8 py-3 flex justify-between items-center sticky top-0 z-50">
             <div className="flex items-center space-x-8">
                 <Link
                     to={user?.role === 'teacher' ? '/teacher' : '/join'}
-                    className="flex items-center space-x-2"
+                    className="flex items-center space-x-2.5"
                 >
-                    <div className="bg-blue-600 p-1.5 rounded-lg text-white">
-                        <Shield size={20} />
+                    <div style={{ backgroundColor: 'var(--accent-color)' }} className="p-1.5 rounded-lg text-white">
+                        <Shield size={18} />
                     </div>
-                    <span className="text-xl font-bold tracking-tight text-slate-900">ATI Secure</span>
+                    <span style={{ color: 'var(--nav-text)' }} className="text-lg font-semibold tracking-tight">ATI Secure</span>
                 </Link>
 
                 {user && (
-                    <div className="hidden lg:flex items-center space-x-1 text-sm font-bold uppercase tracking-wider">
+                    <div className="hidden lg:flex items-center space-x-1 text-sm font-semibold">
                         {user.role === 'teacher' ? (
                             <Link
                                 to="/teacher"
-                                className={`px-4 py-2 rounded-xl transition-all ${location.pathname === '/teacher' ? 'bg-blue-50 text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                                style={{ color: location.pathname === '/teacher' ? 'var(--accent-color)' : 'var(--nav-text-muted)' }}
+                                className={`px-4 py-2 rounded-lg transition-all hover:opacity-80 ${location.pathname === '/teacher' ? 'bg-white/10' : ''}`}
                             >
                                 Dashboard
                             </Link>
                         ) : (
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-1">
                                 <Link
                                     to="/join"
-                                    className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all ${location.pathname === '/join' ? 'bg-blue-50 text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                                    style={{ color: location.pathname === '/join' ? 'var(--accent-color)' : 'var(--nav-text-muted)' }}
+                                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all hover:opacity-80 ${location.pathname === '/join' ? 'bg-white/10' : ''}`}
                                 >
-                                    <Home size={16} />
+                                    <Home size={15} />
                                     <span>Join Exam</span>
                                 </Link>
                                 <Link
                                     to="/history"
-                                    className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all ${location.pathname === '/history' ? 'bg-blue-50 text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                                    style={{ color: location.pathname === '/history' ? 'var(--accent-color)' : 'var(--nav-text-muted)' }}
+                                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all hover:opacity-80 ${location.pathname === '/history' ? 'bg-white/10' : ''}`}
                                 >
-                                    <History size={16} />
+                                    <History size={15} />
                                     <span>History</span>
                                 </Link>
                             </div>
@@ -58,30 +77,43 @@ const Navbar = () => {
             </div>
 
             {user && (
-                <div className="flex items-center space-x-6">
+                <div className="flex items-center space-x-4">
+                    {/* Theme Toggle */}
                     <button
-                        aria-label="Notifications"
-                        className="text-slate-400 hover:text-slate-600 transition-colors relative"
+                        onClick={toggleTheme}
+                        style={{ color: 'var(--nav-text-muted)' }}
+                        className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+                        aria-label="Toggle theme"
+                        title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
                     >
-                        <Bell size={20} />
-                        <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                        {isDark ? <Sun size={18} /> : <Moon size={18} />}
                     </button>
 
-                    <div className="flex items-center space-x-3 pl-6 border-l border-slate-100">
+                    <button
+                        aria-label="Notifications"
+                        style={{ color: 'var(--nav-text-muted)' }}
+                        className="relative hover:opacity-80 transition-colors"
+                    >
+                        <Bell size={18} />
+                        <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                    </button>
+
+                    <div style={{ borderLeft: '1px solid var(--nav-border)' }} className="flex items-center space-x-3 pl-4">
                         <div className="text-right hidden sm:block">
-                            <p className="text-sm font-semibold text-slate-900 leading-none">{user.name}</p>
-                            <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mt-1.5">{user.role}</p>
+                            <p style={{ color: 'var(--nav-text)' }} className="text-sm font-semibold leading-none">{user.name}</p>
+                            <p style={{ color: 'var(--nav-text-muted)' }} className="text-[10px] uppercase tracking-wider font-medium mt-1">{user.role}</p>
                         </div>
-                        <div className="w-9 h-9 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 overflow-hidden border border-slate-200">
-                            <User size={20} />
+                        <div style={{ backgroundColor: 'var(--nav-border)' }} className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+                            <User size={16} style={{ color: 'var(--nav-text-muted)' }} />
                         </div>
                         <button
                             onClick={handleLogout}
-                            className="text-slate-400 hover:text-red-500 transition-colors ml-2"
+                            style={{ color: 'var(--nav-text-muted)' }}
+                            className="hover:text-red-400 transition-colors ml-1"
                             aria-label="Logout"
                             title="Logout"
                         >
-                            <LogOut size={18} />
+                            <LogOut size={16} />
                         </button>
                     </div>
                 </div>

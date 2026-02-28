@@ -1,70 +1,299 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand-bg: #f0f7ff;
-  --color-brand-card: #ffffff;
-  --color-brand-primary: #2563eb;
-  --color-brand-secondary: #64748b;
-  --color-brand-accent: #0f172a;
-  --color-success: #10b981;
-  --color-danger: #ef4444;
-  --color-warning: #f59e0b;
+  --color-brand-bg: var(--bg-primary);
+  --color-brand-card: var(--bg-card);
+  --color-brand-primary: var(--accent-color);
+  --color-brand-secondary: var(--text-secondary);
+  --color-brand-accent: var(--text-primary);
+  --color-success: var(--success-color);
+  --color-danger: var(--danger-color);
+  --color-warning: #D97706;
   --shadow-soft: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-card: 0 10px 15px -3px rgb(0 0 0 / 0.05), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
 }
 
-:root {
+/* ===== THEME VARIABLES ===== */
+:root,
+[data-theme="light"] {
+  --bg-primary: #F4F6F8;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #F8FAFC;
+  --text-primary: #1E2A38;
+  --text-secondary: #64748B;
+  --text-muted: #94A3B8;
+  --border-color: #E2E8F0;
+  --border-hover: #CBD5E1;
+  --accent-color: #2F5D9F;
+  --accent-hover: #1E4A82;
+  --accent-light: #EBF0F7;
+  --danger-color: #B23A48;
+  --danger-hover: #932E3B;
+  --danger-light: #FBF0F1;
+  --success-color: #2A7F62;
+  --success-light: #ECFDF5;
+  --warning-light: #FFFBEB;
+  --teal-accent: #3B7A78;
+  --teal-light: #EDF7F7;
+  --nav-bg: #1E2A38;
+  --nav-text: #E5E7EB;
+  --nav-text-muted: #94A3B8;
+  --nav-border: #2D3B4D;
+  --menu-bg: #FFFFFF;
+  --menu-hover: #F1F5F9;
+  --input-bg: #F8FAFC;
+  --input-border: #E2E8F0;
+  --input-focus: #2F5D9F;
+  --stat-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.04);
+  --card-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
+  --modal-overlay: rgba(0, 0, 0, 0.4);
+  --toast-bg: #1E2A38;
+  --toast-text: #FFFFFF;
   color-scheme: light;
 }
 
+[data-theme="dark"] {
+  --bg-primary: #121A24;
+  --bg-card: #1A2332;
+  --bg-card-hover: #1F2D3F;
+  --text-primary: #E5E7EB;
+  --text-secondary: #9CA3AF;
+  --text-muted: #6B7280;
+  --border-color: #2D3B4D;
+  --border-hover: #3D4F65;
+  --accent-color: #5B8FD4;
+  --accent-hover: #7AA8E5;
+  --accent-light: #1A2B3F;
+  --danger-color: #E5636F;
+  --danger-hover: #F08591;
+  --danger-light: #2D1B1F;
+  --success-color: #34D399;
+  --success-light: #1B2D25;
+  --warning-light: #2D2A1B;
+  --teal-accent: #5BADA9;
+  --teal-light: #1A2D2D;
+  --nav-bg: #0F1620;
+  --nav-text: #E5E7EB;
+  --nav-text-muted: #6B7280;
+  --nav-border: #1E2A38;
+  --menu-bg: #1A2332;
+  --menu-hover: #1F2D3F;
+  --input-bg: #1A2332;
+  --input-border: #2D3B4D;
+  --input-focus: #5B8FD4;
+  --stat-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.2);
+  --card-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.2), 0 1px 2px -1px rgb(0 0 0 / 0.15);
+  --modal-overlay: rgba(0, 0, 0, 0.6);
+  --toast-bg: #E5E7EB;
+  --toast-text: #1E2A38;
+  color-scheme: dark;
+}
+
+/* ===== BASE STYLES ===== */
 body {
   margin: 0;
   padding: 0;
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  background-color: var(--color-brand-bg);
-  color: #1e293b;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
   overflow-x: hidden;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Custom Scrollbar */
+/* ===== SCROLLBAR ===== */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--color-brand-bg);
+  background: var(--bg-primary);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--border-color);
   border-radius: 12px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--text-muted);
 }
 
+/* ===== CARD ===== */
 .card {
-  background: var(--color-brand-card);
+  background: var(--bg-card);
   border-radius: 12px;
-  box-shadow: var(--shadow-card);
-  border: 1px solid #e2e8f0;
+  box-shadow: var(--card-shadow);
+  border: 1px solid var(--border-color);
 }
 
-.btn-primary {
-  background: var(--color-brand-primary);
-  color: white;
-  border-radius: 8px;
-  padding: 0.75rem 1.5rem;
+/* ===== PROFESSIONAL BUTTON SYSTEM ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  border-radius: 10px;
   font-weight: 600;
-  transition: all 0.2s;
+  font-size: 0.8125rem;
+  line-height: 1;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
-.btn-primary:hover {
-  background: #1d4ed8;
-  transform: translateY(-1px);
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
 }
 
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* Primary — Academic Blue */
+.btn-primary {
+  background-color: var(--accent-color);
+  color: #FFFFFF;
+  border-color: var(--accent-color);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+/* Secondary — Outline Navy */
+.btn-secondary {
+  background-color: transparent;
+  color: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: var(--accent-light);
+}
+
+/* Danger — Muted Red */
+.btn-danger {
+  background-color: var(--danger-color);
+  color: #FFFFFF;
+  border-color: var(--danger-color);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: var(--danger-hover);
+  border-color: var(--danger-hover);
+}
+
+/* Ghost Button */
+.btn-ghost {
+  background-color: transparent;
+  color: var(--text-secondary);
+  border-color: var(--border-color);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background-color: var(--bg-card-hover);
+  border-color: var(--border-hover);
+}
+
+/* Small button variant */
+.btn-sm {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  border-radius: 8px;
+}
+
+/* ===== INPUT SYSTEM ===== */
+.input-field {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background-color: var(--input-bg);
+  border: 1.5px solid var(--input-border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.input-field::placeholder {
+  color: var(--text-muted);
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: var(--input-focus);
+  background-color: var(--bg-card);
+  box-shadow: 0 0 0 3px rgba(47, 93, 159, 0.1);
+}
+
+/* ===== TOAST NOTIFICATION ===== */
+.toast-container {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  padding: 0.75rem 1.25rem;
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.15);
+  animation: toast-in 0.3s ease;
+  max-width: 360px;
+}
+
+.toast-success {
+  background-color: var(--success-color);
+  color: #FFFFFF;
+}
+
+.toast-error {
+  background-color: var(--danger-color);
+  color: #FFFFFF;
+}
+
+.toast-info {
+  background-color: var(--toast-bg);
+  color: var(--toast-text);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+/* ===== ANIMATIONS ===== */
 @keyframes badge-float {
   0% {
     transform: translateY(0px);
