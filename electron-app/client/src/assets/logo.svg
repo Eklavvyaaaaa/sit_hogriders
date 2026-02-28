@@ -1,0 +1,40 @@
+<svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .book-top {
+      animation: rotate-top 4s ease-in-out infinite;
+      transform-origin: 10px 25px; /* Pivot from the left spine center */
+    }
+    .book-bottom {
+      animation: rotate-bottom 4s ease-in-out infinite;
+      transform-origin: 10px 55px; /* Pivot from the left spine center */
+    }
+
+    @keyframes rotate-top {
+      0%, 100% { transform: rotate(0deg); }
+      40% { transform: rotate(-15deg); }
+      60% { transform: rotate(-15deg); }
+    }
+
+    @keyframes rotate-bottom {
+      0%, 100% { transform: rotate(0deg); }
+      40% { transform: rotate(15deg); }
+      60% { transform: rotate(15deg); }
+    }
+  </style>
+  
+  <g transform="translate(10, 15)">
+    <!-- Top Purple Book -->
+    <g class="book-top">
+      <path d="M10 25C10 16.7157 16.7157 10 25 10H65C67.7614 10 70 12.2386 70 15V35C70 37.7614 67.7614 40 65 40H25C16.7157 40 10 33.2843 10 25Z" fill="#A78BFA" stroke="#1E293B" stroke-width="4"/>
+      <path d="M25 18H62V32H25C21.134 32 18 28.866 18 25C18 21.134 21.134 18 25 18Z" fill="white" stroke="#1E293B" stroke-width="3"/>
+    </g>
+    
+    <!-- Bottom Yellow/Orange Book -->
+    <g class="book-bottom">
+      <path d="M5 55C5 46.7157 11.7157 40 20 40H75C77.7614 40 80 42.2386 80 45V65C80 67.7614 77.7614 70 75 70H20C11.7157 70 5 63.2843 5 55Z" fill="#FBBF24" stroke="#1E293B" stroke-width="4"/>
+      <path d="M20 48H72V62H20C16.134 62 13 58.866 13 55C13 51.134 16.134 48 20 48Z" fill="#F1F5F9" stroke="#1E293B" stroke-width="3"/>
+      <!-- Bookmark on Bottom Book -->
+      <path d="M25 48V65L32 60L39 65V48H25Z" fill="#22D3EE" stroke="#1E293B" stroke-width="2"/>
+    </g>
+  </g>
+</svg>

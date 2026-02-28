@@ -4,7 +4,8 @@
   "description": "Backend for AI Exam Monitoring System",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "jest tests/reviewRoutes.test.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

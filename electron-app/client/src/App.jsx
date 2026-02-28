@@ -4,11 +4,13 @@ import { AuthProvider, AuthContext } from './context/AuthContext';
 import Login from './pages/Login';
 import TeacherDashboard from './pages/TeacherDashboard';
 import CreateExam from './pages/CreateExam';
+import StudentDashboard from './pages/StudentDashboard';
 import JoinClassroom from './pages/JoinClassroom';
 import ExamPage from './pages/ExamPage';
 import MonitorDashboard from './pages/MonitorDashboard';
 import StudentHistory from './pages/StudentHistory';
 import SubmissionResults from './pages/SubmissionResults';
+import SubmissionReview from './pages/SubmissionReview';
 import ExamResults from './pages/ExamResults';
 
 const ProtectedRoute = ({ children, roleRequired }) => {
@@ -25,7 +27,7 @@ const ProtectedRoute = ({ children, roleRequired }) => {
   if (loading) return <div className="h-screen bg-white flex items-center justify-center text-slate-500 font-medium">Loading...</div>;
   if (!effectiveUser) return <Navigate to="/login" replace />;
   if (roleRequired && effectiveUser.role !== roleRequired) {
-    return <Navigate to={effectiveUser.role === 'teacher' ? '/teacher' : '/join'} replace />;
+    return <Navigate to={effectiveUser.role === 'teacher' ? '/teacher' : '/dashboard'} replace />;
   }
 
   return children;
@@ -39,7 +41,7 @@ const AppRoutes = () => {
       <Route path="/login" element={<Login />} />
       <Route
         path="/"
-        element={<Navigate to={user ? (user.role === 'teacher' ? '/teacher' : '/join') : '/login'} replace />}
+        element={<Navigate to={user ? (user.role === 'teacher' ? '/teacher' : '/dashboard') : '/login'} replace />}
       />
 
       {/* Teacher Routes */}
@@ -78,6 +80,14 @@ const AppRoutes = () => {
 
       {/* Student Routes */}
       <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute roleRequired="student">
+            <StudentDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/join"
         element={
           <ProtectedRoute roleRequired="student">
@@ -98,6 +108,14 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute roleRequired="student">
             <StudentHistory />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/review/:submissionId"
+        element={
+          <ProtectedRoute roleRequired="student">
+            <SubmissionReview />
           </ProtectedRoute>
         }
       />

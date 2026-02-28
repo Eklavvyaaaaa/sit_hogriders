@@ -10,12 +10,18 @@ const StudentHistory = () => {
     const [error, setError] = useState(null);
     const navigate = useNavigate();
 
+    const getScoreBadge = (score) => {
+        if (score === null || score === undefined) return { bg: 'bg-slate-50', text: 'text-slate-500', border: 'border-slate-200' };
+        if (score >= 80) return { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' };
+        if (score >= 55) return { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' };
+        return { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' };
+    };
+
     useEffect(() => {
         const fetchHistory = async () => {
             try {
-                const res = await api.get('/history/student');
+                const res = await api.get('/history');
                 setHistory(res.data);
-                setError(null);
             } catch (err) {
                 console.error('Failed to fetch history', err);
                 setError(err);
@@ -25,13 +31,6 @@ const StudentHistory = () => {
         };
         fetchHistory();
     }, []);
-
-    const getScoreBadge = (score) => {
-        if (score === null || score === undefined) return { bg: 'bg-slate-50', text: 'text-slate-500', border: 'border-slate-200' };
-        if (score >= 80) return { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' };
-        if (score >= 55) return { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' };
-        return { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' };
-    };
 
     return (
         <div className="min-h-screen bg-white flex flex-col font-inter">
@@ -139,6 +138,10 @@ const StudentHistory = () => {
                         </table>
                     </div>
                 )}
+
+                <p className="text-center text-slate-300 text-[11px] font-bold uppercase tracking-widest mt-12">
+                    ATI Secure Smart Assessment Technology
+                </p>
             </div>
         </div>
     );

@@ -116,11 +116,7 @@ exports.submitExam = async (req, res) => {
             return res.status(403).json({ message: 'Not enrolled in this exam' });
         }
 
-        // Avoid double submission
-        const subCheck = await query('SELECT id FROM submissions WHERE exam_id = $1 AND student_id = $2 AND status = $3', [examId, studentId, 'submitted']);
-        if (subCheck.rows.length > 0) {
-            return res.status(400).json({ message: 'Exam has already been submitted' });
-        }
+
 
         // Parse exam questions
         let questions;
@@ -214,11 +210,21 @@ exports.submitExam = async (req, res) => {
         try {
             await client.query('BEGIN');
 
-            const subResult = await client.query(
-                `INSERT INTO submissions (student_id, exam_id, answers_json, score, status, submitted_at)
-                     VALUES ($1, $2, $3, $4, 'submitted', CURRENT_TIMESTAMP) RETURNING id`,
-                [studentId, examId, JSON.stringify(answers), mcqScore]
-            );
+            let subResult;
+            try {
+                // We rely on the unique constraint (exam_id, student_id) in the DB to prevent double submissions.
+                subResult = await client.query(
+                    `INSERT INTO submissions (student_id, exam_id, answers_json, score, status, submitted_at)
+                         VALUES ($1, $2, $3, $4, 'submitted', CURRENT_TIMESTAMP) RETURNING id`,
+                    [studentId, examId, JSON.stringify(answers), mcqScore]
+                );
+            } catch (insertErr) {
+                if (insertErr.code === '23505') { // Postgres unique_violation error code
+                    await client.query('ROLLBACK');
+                    return res.status(400).json({ message: 'Exam has already been submitted' });
+                }
+                throw insertErr;
+            }
             const submissionId = subResult.rows[0].id;
 
             for (const evalData of atiEvaluations) {

@@ -63,10 +63,10 @@ exports.getStats = async (req, res) => {
 
 // Dashboard overview — returns exact shape: totalExams, activeExams, completedExams, totalViolations, totalStudents
 exports.getOverview = async (req, res) => {
-    try {
-        const teacherId = req.user.id;
+  try {
+    const teacherId = req.user.id;
 
-        const overviewQuery = `
+    const overviewQuery = `
       WITH teacher_exams AS (
         SELECT id, status FROM exams WHERE teacher_id = $1
       ),
@@ -95,8 +95,8 @@ exports.getOverview = async (req, res) => {
         (SELECT violations FROM violation_counts) as total_violations
     `;
 
-        const result = await query(overviewQuery, [teacherId]);
-        const row = result.rows[0];
+    const result = await query(overviewQuery, [teacherId]);
+    const row = result.rows[0];
 
         res.json({
             totalExams: parseInt(row.total_exams || 0),

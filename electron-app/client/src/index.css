@@ -120,6 +120,10 @@ body {
   }
 }
 
+.animate-fade-in {
+  animation: fade-in 200ms ease-out forwards;
+}
+
 .animate-badge {
   animation: badge-float 6s ease-in-out infinite;
 }
@@ -152,6 +156,24 @@ body {
   animation: line-draw 0.8s ease-out forwards;
   animation-delay: 1.8s;
   opacity: 0;
+}
+
+@keyframes antigravity-logo {
+
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+    filter: brightness(1) drop-shadow(0 4px 6px rgba(37, 99, 235, 0.1));
+  }
+
+  50% {
+    transform: translateY(-8px) scale(1.05);
+    filter: brightness(1.15) drop-shadow(0 15px 20px rgba(37, 99, 235, 0.3));
+  }
+}
+
+.animate-antigravity {
+  animation: antigravity-logo 4s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {

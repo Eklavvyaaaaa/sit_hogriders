@@ -136,7 +136,10 @@ const initDB = async () => {
       "DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='students_exam' AND column_name='joined_at' AND udt_name='timestamp') THEN ALTER TABLE students_exam ALTER COLUMN joined_at TYPE TIMESTAMPTZ USING joined_at AT TIME ZONE 'UTC'; END IF; END $$",
       "DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chat_messages' AND column_name='created_at' AND udt_name='timestamp') THEN ALTER TABLE chat_messages ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC'; END IF; END $$",
       // Rename legacy 'message' column to 'message_text' if it exists
-      "DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chat_messages' AND column_name='message') THEN ALTER TABLE chat_messages RENAME COLUMN message TO message_text; END IF; END $$"
+      "DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chat_messages' AND column_name='message') THEN ALTER TABLE chat_messages RENAME COLUMN message TO message_text; END IF; END $$",
+      // Unique constraint for submissions to prevent duplicate submission race conditions
+      "ALTER TABLE submissions DROP CONSTRAINT IF EXISTS unique_submission_exam_student",
+      "ALTER TABLE submissions ADD CONSTRAINT unique_submission_exam_student UNIQUE (exam_id, student_id)"
     ];
 
     for (const migration of migrations) {

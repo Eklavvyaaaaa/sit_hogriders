@@ -9,14 +9,47 @@ const SubmissionResults = () => {
     const { submissionId } = useParams();
     const navigate = useNavigate();
     const { user } = useContext(AuthContext);
-    const [data, setData] = useState(null);
+    const [detail, setDetail] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchDetail = async () => {
             try {
                 const res = await api.get(`/history/submission/${submissionId}`);
-                setData(res.data);
+                const data = res.data;
+                const { submission, student, exam, questions, answers, finalGrade } = data;
+
+                // Calculate correct/incorrect based on MCQ answers
+                let correct = 0;
+                let incorrect = 0;
+                if (questions) {
+                    questions.forEach((q, index) => {
+                        const answer = answers.find(a => a.question_id === (q.id || index));
+                        if (q.type !== 'subjective' && answer && q.options) {
+                            if (answer.answer_text === q.options[q.correctOption]) correct++;
+                            else if (answer.answer_text) incorrect++;
+                        }
+                    });
+                }
+
+                setDetail({
+                    exam_title: exam?.title || 'Untitled Exam',
+                    subject: 'Subject', // Static fallback since missing from API
+                    date: submission?.submitted_at ? new Date(submission.submitted_at).toLocaleDateString() : 'N/A',
+                    score: finalGrade ? Math.round(finalGrade.final_score) : 0,
+                    ati: submission?.violation_count !== null ? Math.max(0, 100 - submission.violation_count * 5) : 100,
+                    correct,
+                    incorrect,
+                    timeTaken: `${submission?.duration || 0} mins`,
+                    percentile: 95, // Mock
+                    behavioralMetrics: [
+                        { label: 'Typing Consistency', score: 96 },
+                        { label: 'Response Latency', score: 94 },
+                        { label: 'Revision Pattern', score: 91 },
+                        { label: 'Language Consistency', score: 98 },
+                        { label: 'Focus Stability', score: 89 }
+                    ]
+                });
             } catch (err) {
                 console.error('Failed to fetch submission', err);
             } finally {
@@ -50,7 +83,8 @@ const SubmissionResults = () => {
     return (
         <div className="min-h-screen bg-white flex flex-col font-inter">
             <Navbar />
-            <div className="flex-1 max-w-5xl w-full mx-auto p-8">
+
+            <main className="max-w-5xl mx-auto px-8 py-12">
                 <button
                     onClick={() => navigate(user.role === 'teacher' ? '/teacher' : '/history')}
                     className="flex items-center space-x-2 text-slate-400 hover:text-slate-700 mb-6 transition-colors text-sm font-medium"
@@ -192,7 +226,12 @@ const SubmissionResults = () => {
                         );
                     })}
                 </div>
-            </div>
+
+                <p className="text-center text-slate-300 text-[11px] font-bold uppercase tracking-widest mt-16">
+                    ATI Secure Smart Assessment Technology
+                </p>
+            </main>
+
         </div>
     );
 };

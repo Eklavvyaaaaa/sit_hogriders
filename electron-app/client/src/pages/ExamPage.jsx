@@ -291,6 +291,33 @@ const ExamPage = () => {
                         </div>
 
                         <div className="space-y-4">
+                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Question Navigator</h3>
+                            <div className="grid grid-cols-4 gap-2">
+                                {examData.questions.map((q, i) => {
+                                    const isAnswered = q.type === 'subjective'
+                                        ? !!(textAnswers[i] && textAnswers[i].trim())
+                                        : answers[i] !== undefined;
+
+                                    return (
+                                        <button
+                                            key={i}
+                                            onClick={() => setCurrentIndex(i)}
+                                            className={`aspect-square rounded-lg font-bold text-sm flex items-center justify-center transition-all ${i === currentIndex
+                                                ? 'ring-2 ring-blue-600 ring-offset-2'
+                                                : 'hover:scale-105'
+                                                } ${isAnswered
+                                                    ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
+                                                    : 'bg-white text-slate-500 border border-slate-200'
+                                                }`}
+                                        >
+                                            {i + 1}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
                             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Security Status</h3>
                             <div className="space-y-3">
                                 <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100">

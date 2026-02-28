@@ -2,6 +2,7 @@ import React, { useState, useContext, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { Shield, Eye, EyeOff } from 'lucide-react';
+import logo from '../assets/logo.svg';
 
 const BadgeAnimation = () => {
     return (
@@ -87,10 +88,12 @@ const Login = () => {
         <div className="min-h-screen flex font-inter overflow-hidden">
             {/* Left Half: Animation & Welcome (White background) */}
             <div className="hidden lg:flex w-1/2 bg-white flex-col relative p-16 justify-center items-center">
-                <div className="absolute top-12 left-12 flex items-center space-x-2">
-                    <div className="bg-blue-600 p-1.5 rounded-lg text-white">
-                        <Shield size={24} />
-                    </div>
+                <div className="absolute top-12 left-12 flex items-center space-x-3">
+                    <img
+                        src={logo}
+                        alt="Logo"
+                        className="w-10 h-10 object-contain animate-antigravity"
+                    />
                     <span className="text-2xl font-black text-slate-900 tracking-tight">ATI Secure</span>
                 </div>
 
@@ -114,14 +117,16 @@ const Login = () => {
             <div className="w-full lg:w-1/2 bg-[#f0f7ff] flex items-center justify-center p-8 relative">
                 {/* Mobile Header */}
                 <div className="lg:hidden absolute top-8 left-8 flex items-center space-x-2">
-                    <div className="bg-blue-600 p-1.5 rounded-lg text-white">
-                        <Shield size={20} />
-                    </div>
+                    <img
+                        src={logo}
+                        alt="Logo"
+                        className="w-8 h-8 object-contain animate-antigravity"
+                    />
                     <span className="text-xl font-bold text-slate-900 tracking-tight">ATI Secure</span>
-                </div>
+                </div >
 
                 {/* Main Card with Smooth Height Transition */}
-                <div
+                < div
                     className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-white/50 relative overflow-hidden transition-all duration-500 ease-in-out"
                     style={{ height: formHeight !== 'auto' ? `${formHeight + 80}px` : 'auto' }}
                 >
@@ -129,12 +134,42 @@ const Login = () => {
 
                     <div ref={formRef} className="p-12">
                         <h2 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">{isRegister ? 'Create Account' : 'Sign in'}</h2>
-                        <p className="text-slate-500 text-sm mb-10 font-medium">
+                        <p className="text-slate-500 text-sm mb-8 font-medium">
                             {isRegister ? 'Already have an account?' : 'New to ATI Secure?'}{' '}
                             <button type="button" onClick={handleToggle} className="text-blue-600 font-bold hover:underline">
                                 {isRegister ? 'Sign in here' : 'Create an account'}
                             </button>
                         </p>
+
+                        {/* Role Toggle Switch */}
+                        <div className="relative flex w-full p-1 bg-white border border-slate-200 rounded-full mb-8 shadow-inner shadow-slate-100/50">
+                            {/* Sliding Active Background */}
+                            <div
+                                className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-blue-600 rounded-full transition-all duration-300 ease-out shadow-sm shadow-blue-500/30 ${formData.role === 'student' ? 'left-1' : 'left-[calc(50%+2px)]'
+                                    }`}
+                            ></div>
+
+                            <button
+                                type="button"
+                                onClick={() => setFormData({ ...formData, role: 'student' })}
+                                aria-label="Select Student Role"
+                                aria-pressed={formData.role === 'student'}
+                                className={`relative w-1/2 py-2.5 text-sm font-bold rounded-full transition-colors z-10 ${formData.role === 'student' ? 'text-white' : 'text-slate-500 hover:text-slate-700'
+                                    }`}
+                            >
+                                Student
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setFormData({ ...formData, role: 'teacher' })}
+                                aria-label="Select Teacher Role"
+                                aria-pressed={formData.role === 'teacher'}
+                                className={`relative w-1/2 py-2.5 text-sm font-bold rounded-full transition-colors z-10 ${formData.role === 'teacher' ? 'text-white' : 'text-slate-500 hover:text-slate-700'
+                                    }`}
+                            >
+                                Teacher
+                            </button>
+                        </div>
 
                         {error && (
                             <div className="bg-red-50 border border-red-100 text-red-600 p-4 rounded-xl mb-8 text-sm font-bold flex items-center animate-shake">
@@ -211,10 +246,11 @@ const Login = () => {
                         <div className="mt-12 text-slate-400 text-[11px] text-center leading-relaxed font-semibold">
                             By signing in, you agree to our <button className="text-slate-600 underline">Terms of use</button> and acknowledge our <button className="text-slate-600 underline">Privacy notice</button>.
                         </div>
+
                     </div>
-                </div>
-            </div>
-        </div>
+                </div >
+            </div >
+        </div >
     );
 };
 

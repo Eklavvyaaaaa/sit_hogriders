@@ -65,12 +65,29 @@ function initSocket(httpServer) {
     io.on('connection', (socket) => {
         console.log(`Socket connected: ${socket.id} (user: ${socket.user?.id})`);
 
-        // Teachers join an exam room to receive updates
+        // Teachers or students join an exam room to receive updates
         socket.on('join:exam', async (examId, callback) => {
             const parsedId = parseInt(examId, 10);
             if (!parsedId || isNaN(parsedId) || parsedId <= 0) {
                 console.log(`Invalid examId provided for socket join: ${examId}`);
                 if (typeof callback === 'function') callback({ error: 'Invalid exam ID' });
+                return;
+            }
+
+            // Verify authentication explicitly
+            const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.split(' ')[1];
+            if (!token) {
+                socket.emit('error', { message: 'Authentication required' });
+                socket.disconnect();
+                return;
+            }
+
+            try {
+                const decoded = jwt.verify(token, process.env.JWT_SECRET);
+                socket.user = decoded;
+            } catch (err) {
+                socket.emit('error', { message: 'Invalid or expired token' });
+                socket.disconnect();
                 return;
             }
             try {
@@ -92,6 +109,23 @@ function initSocket(httpServer) {
             const parsedId = parseInt(examId, 10);
             if (!parsedId || isNaN(parsedId) || parsedId <= 0) {
                 if (typeof callback === 'function') callback({ error: 'Invalid exam ID' });
+                return;
+            }
+
+            // Verify authentication explicitly
+            const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.split(' ')[1];
+            if (!token) {
+                socket.emit('error', { message: 'Authentication required' });
+                socket.disconnect();
+                return;
+            }
+
+            try {
+                const decoded = jwt.verify(token, process.env.JWT_SECRET);
+                socket.user = decoded;
+            } catch (err) {
+                socket.emit('error', { message: 'Invalid or expired token' });
+                socket.disconnect();
                 return;
             }
             try {

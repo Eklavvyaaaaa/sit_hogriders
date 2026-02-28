@@ -20,7 +20,7 @@ const Timer = ({ durationMinutes, onTimeUp }) => {
     }
 
     // Redirect to student dashboard / exam history after submission
-    navigate('/join', { replace: true });
+    navigate('/dashboard', { replace: true });
   }, [onTimeUp, navigate]);
 
   useEffect(() => {
