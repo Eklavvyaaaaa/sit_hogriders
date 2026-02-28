@@ -19,15 +19,19 @@ exports.markAsRead = async (req, res) => {
     const { id } = req.params; // 'all' or specific ID
 
     try {
-        if (id === 'all') {
+        if (id !== 'all') {
+            const numId = parseInt(id, 10);
+            if (isNaN(numId) || numId <= 0) {
+                return res.status(400).json({ message: 'Invalid notification ID' });
+            }
             await pool.query(
-                'UPDATE notifications SET is_read = true WHERE user_id = $1 AND is_read = false',
-                [userId]
+                'UPDATE notifications SET is_read = true WHERE id = $1 AND user_id = $2 AND is_read = false',
+                [numId, userId]
             );
         } else {
             await pool.query(
-                'UPDATE notifications SET is_read = true WHERE id = $1 AND user_id = $2 AND is_read = false',
-                [id, userId]
+                'UPDATE notifications SET is_read = true WHERE user_id = $1 AND is_read = false',
+                [userId]
             );
         }
         res.json({ success: true });

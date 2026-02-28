@@ -11,26 +11,33 @@ const LiveVideoModal = ({ student, examId, onClose }) => {
     const studentId = student.sender_id || student.id || student.student_id;
 
     useEffect(() => {
-        // Fire initial request so WebRTCContext negotiates with Student globally
+        // Stop retrying if already connected, failed, or if stream arrived
+        if (status !== 'connecting' || remoteStreams[studentId]) return;
+
+        console.log(`[LiveVideoModal] Requesting feed for ${studentId}...`);
         requestVideoFeed(studentId, examId);
 
-        // Retry every 5 seconds if stream hasn't arrived (no dependency on remoteStreams to avoid infinite loop)
         const retryInterval = setInterval(() => {
+            // Re-check status inside interval to stop correctly
+            if (status !== 'connecting' || remoteStreams[studentId]) {
+                clearInterval(retryInterval);
+                return;
+            }
+            console.log(`[LiveVideoModal] Retrying feed for ${studentId}...`);
             requestVideoFeed(studentId, examId);
         }, 5000);
 
-        // Timeout after 30s
         const failTimeout = setTimeout(() => {
-            clearInterval(retryInterval);
-            setStatus(prev => prev === 'connecting' ? 'failed' : prev);
+            if (status === 'connecting' && !remoteStreams[studentId]) {
+                setStatus('failed');
+            }
         }, 30000);
 
         return () => {
             clearInterval(retryInterval);
             clearTimeout(failTimeout);
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [studentId, examId]);
+    }, [studentId, examId, requestVideoFeed, status, remoteStreams]);
 
     // Attach stream to video element when it arrives
     useEffect(() => {
