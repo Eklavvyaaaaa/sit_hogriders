@@ -1,0 +1,14 @@
+type,question,optionA,optionB,optionC,optionD,correctAnswer,maxMarks,difficulty,subject
+MCQ,What is the SI unit of force?,Joule,Newton,Watt,Pascal,B,1,Easy,Physics
+MCQ,Which planet is known as the Red Planet?,Venus,Mars,Jupiter,Saturn,B,1,Easy,Science
+MCQ,What is the chemical symbol for water?,H2O,CO2,NaCl,O2,A,1,Easy,Chemistry
+MCQ,Which data structure uses FIFO?,Stack,Queue,Tree,Graph,B,2,Medium,Computer Science
+MCQ,What is the time complexity of binary search?,O(n),O(log n),O(n^2),O(1),B,2,Medium,Computer Science
+MCQ,Which gas is most abundant in Earth's atmosphere?,Oxygen,Carbon Dioxide,Nitrogen,Hydrogen,C,1,Easy,Science
+MCQ,What is the derivative of x^2?,x,2x,x^2,2,B,2,Medium,Mathematics
+MCQ,Which protocol is used for secure web browsing?,HTTP,FTP,HTTPS,SMTP,C,1,Easy,Computer Science
+SUBJECTIVE,Explain Newton's Third Law of Motion with examples.,,,,,,5,Medium,Physics
+SUBJECTIVE,Describe the water cycle and its stages.,,,,,,4,Easy,Science
+SUBJECTIVE,What are the advantages and disadvantages of recursion in programming?,,,,,,6,Hard,Computer Science
+SUBJECTIVE,Explain the concept of polymorphism in Object-Oriented Programming.,,,,,,5,Medium,Computer Science
+SUBJECTIVE,Describe the process of photosynthesis in plants.,,,,,,4,Medium,Biology

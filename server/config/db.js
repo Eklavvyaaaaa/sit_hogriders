@@ -114,6 +114,19 @@ const initDB = async () => {
         joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(student_id, exam_id)
       );
+
+      CREATE TABLE IF NOT EXISTS question_bank (
+        id SERIAL PRIMARY KEY,
+        type TEXT NOT NULL CHECK(type IN ('MCQ', 'SUBJECTIVE')),
+        question TEXT NOT NULL,
+        options_json TEXT,
+        correct_answer TEXT,
+        max_marks INTEGER,
+        difficulty TEXT,
+        subject TEXT,
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
     // Run migrations for existing tables (safe to run multiple times)

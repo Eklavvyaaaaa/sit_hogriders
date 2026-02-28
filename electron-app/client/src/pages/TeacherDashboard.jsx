@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import api from '../services/api';
-import { PlusCircle, Eye, Activity, BarChart3, Users, AlertTriangle, Flag, Download, Trophy, CheckCircle2, Loader2, Clock, XCircle, CalendarClock, Copy, MessageSquare, Trash2, MoreVertical, StopCircle, TimerReset, UserCheck } from 'lucide-react';
+import { PlusCircle, Eye, Activity, BarChart3, Users, AlertTriangle, Flag, Download, Trophy, CheckCircle2, Loader2, Clock, XCircle, CalendarClock, Copy, MessageSquare, Trash2, MoreVertical, StopCircle, TimerReset, UserCheck, Upload, ChevronDown, ChevronUp } from 'lucide-react';
 import ChatBox from '../components/ChatBox';
 import { useToast } from '../hooks/useToast';
 import ToastOverlay from '../components/ToastOverlay';
@@ -32,6 +32,16 @@ const TeacherDashboard = () => {
     const navigate = useNavigate();
     const { toasts, addToast, removeToast } = useToast();
 
+    // CSV Upload state
+    const [uploading, setUploading] = useState(false);
+    const [uploadResult, setUploadResult] = useState(null);
+    const fileInputRef = React.useRef(null);
+
+    // Question Bank viewer state
+    const [questionBank, setQuestionBank] = useState([]);
+    const [qbLoading, setQbLoading] = useState(false);
+    const [qbOpen, setQbOpen] = useState(false);
+
     // Modal state
     const [modal, setModal] = useState(null);
     const [modalInput, setModalInput] = useState('');
@@ -60,6 +70,53 @@ const TeacherDashboard = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleFileUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        setUploading(true);
+        setUploadResult(null);
+        try {
+            const res = await api.post('/api/questions/upload', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            setUploadResult({ success: true, data: res.data });
+            addToast(`Successfully inserted ${res.data.inserted} questions.`, 'success');
+            if (res.data.failed > 0) {
+                addToast(`${res.data.failed} rows failed validation. See summary.`, 'warning');
+            }
+        } catch (err) {
+            console.error('CSV Upload Error:', err);
+            const msg = err.response?.data?.message || 'Failed to upload CSV';
+            setUploadResult({ success: false, error: msg });
+            addToast(msg, 'error');
+        } finally {
+            setUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    const fetchQuestionBank = async () => {
+        setQbLoading(true);
+        try {
+            const res = await api.get('/api/questions');
+            setQuestionBank(res.data.questions || []);
+        } catch (err) {
+            console.error('Fetch question bank error:', err);
+            addToast('Failed to load question bank.', 'error');
+        } finally {
+            setQbLoading(false);
+        }
+    };
+
+    const toggleQuestionBank = () => {
+        if (!qbOpen) fetchQuestionBank();
+        setQbOpen(!qbOpen);
     };
 
     useEffect(() => { fetchDashboardData(); }, []);
@@ -278,6 +335,114 @@ const TeacherDashboard = () => {
                                 ))}
                             </div>
                         )}
+
+                        {/* Bulk Upload CSV */}
+                        <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)', boxShadow: 'var(--card-shadow)' }} className="rounded-xl p-6 border mb-8">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div>
+                                    <h3 style={{ color: 'var(--text-primary)' }} className="text-lg font-bold tracking-tight mb-1">Question Bank Upload</h3>
+                                    <p style={{ color: 'var(--text-secondary)' }} className="text-sm font-medium">Bulk upload MCQ and Subjective questions via a unified CSV format.</p>
+                                </div>
+                                <div className="flex items-center">
+                                    <input type="file" accept=".csv" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
+                                    <button onClick={() => fileInputRef.current?.click()} className="btn btn-secondary flex items-center space-x-2" disabled={uploading}>
+                                        {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                                        <span>{uploading ? 'Processing CSV...' : 'Upload CSV Bank'}</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Upload Results Summary */}
+                            {uploadResult && uploadResult.success && uploadResult.data && (
+                                <div className={`mt-4 p-4 rounded-lg border text-sm font-medium ${uploadResult.data.failed > 0 ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                                    <div className="flex items-start justify-between">
+                                        <div>
+                                            <p className={`font-bold ${uploadResult.data.failed > 0 ? 'text-amber-800' : 'text-emerald-800'}`}>
+                                                Upload complete: {uploadResult.data.inserted} inserted, {uploadResult.data.failed} failed.
+                                            </p>
+                                            {uploadResult.data.failed > 0 && uploadResult.data.errors && (
+                                                <ul className="mt-2 space-y-1 text-amber-900 text-xs">
+                                                    {uploadResult.data.errors.slice(0, 5).map((err, i) => (
+                                                        <li key={i}>• Row {err.row}: {err.reason}</li>
+                                                    ))}
+                                                    {uploadResult.data.errors.length > 5 && (
+                                                        <li>• ... and {uploadResult.data.errors.length - 5} more errors.</li>
+                                                    )}
+                                                </ul>
+                                            )}
+                                        </div>
+                                        <button onClick={() => setUploadResult(null)} className="opacity-60 hover:opacity-100 p-1">
+                                            <XCircle size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                            {uploadResult && !uploadResult.success && (
+                                <div className="mt-4 p-4 rounded-lg border bg-red-50 border-red-200 text-red-800 text-sm font-medium flex items-center justify-between">
+                                    <span>Error: {uploadResult.error}</span>
+                                    <button onClick={() => setUploadResult(null)} className="opacity-60 hover:opacity-100 p-1">
+                                        <XCircle size={16} />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* View Question Bank — Collapsible */}
+                        <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)', boxShadow: 'var(--card-shadow)' }} className="rounded-xl border mb-8 overflow-hidden">
+                            <button onClick={toggleQuestionBank} className="w-full flex items-center justify-between p-5 hover:opacity-80 transition-opacity">
+                                <h3 style={{ color: 'var(--text-primary)' }} className="text-base font-bold tracking-tight">📚 View Question Bank</h3>
+                                {qbOpen ? <ChevronUp size={18} style={{ color: 'var(--text-muted)' }} /> : <ChevronDown size={18} style={{ color: 'var(--text-muted)' }} />}
+                            </button>
+                            {qbOpen && (
+                                <div className="px-5 pb-5">
+                                    {qbLoading ? (
+                                        <div className="flex items-center justify-center py-8">
+                                            <Loader2 size={24} style={{ color: 'var(--accent-color)' }} className="animate-spin" />
+                                        </div>
+                                    ) : questionBank.length === 0 ? (
+                                        <p style={{ color: 'var(--text-muted)' }} className="text-center py-8 text-sm font-medium">No questions uploaded yet. Use the CSV upload above to get started.</p>
+                                    ) : (
+                                        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+                                            {questionBank.map((q, i) => (
+                                                <div key={q.id} style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)' }} className="rounded-lg border p-4">
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2 mb-1.5">
+                                                                <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${q.type === 'MCQ'
+                                                                        ? 'bg-blue-50 text-blue-600 border-blue-200'
+                                                                        : 'bg-purple-50 text-purple-600 border-purple-200'
+                                                                    }`}>{q.type}</span>
+                                                                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{q.subject}</span>
+                                                                <span className={`text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-md ${q.difficulty === 'Easy' ? 'bg-green-50 text-green-600'
+                                                                        : q.difficulty === 'Hard' ? 'bg-red-50 text-red-600'
+                                                                            : 'bg-yellow-50 text-yellow-600'
+                                                                    }`}>{q.difficulty}</span>
+                                                            </div>
+                                                            <p style={{ color: 'var(--text-primary)' }} className="text-sm font-semibold">{q.question}</p>
+                                                            {q.type === 'MCQ' && q.options && (
+                                                                <div className="mt-2 grid grid-cols-2 gap-1.5">
+                                                                    {['A', 'B', 'C', 'D'].map(letter => (
+                                                                        <span key={letter} className={`text-xs px-2 py-1 rounded-md font-medium ${q.correct_answer === letter
+                                                                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                                                                : 'bg-slate-50 text-slate-600 border border-slate-100'
+                                                                            }`}>
+                                                                            <strong>{letter}.</strong> {q.options[letter]}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                            {q.type === 'SUBJECTIVE' && (
+                                                                <p className="text-xs text-slate-400 mt-1 font-medium">Max Marks: {q.max_marks}</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
 
                         <div style={{ borderColor: 'var(--border-color)' }} className="border-t mb-6"></div>
 
