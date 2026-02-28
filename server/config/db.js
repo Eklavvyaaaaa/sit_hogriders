@@ -115,6 +115,17 @@ const initDB = async () => {
         UNIQUE(student_id, exam_id)
       );
 
+      CREATE TABLE IF NOT EXISTS question_bank (
+        id SERIAL PRIMARY KEY,
+        type TEXT NOT NULL CHECK(type IN ('MCQ', 'SUBJECTIVE')),
+        question TEXT NOT NULL,
+        options_json TEXT,
+        correct_answer TEXT,
+        max_marks INTEGER,
+        difficulty TEXT,
+        subject TEXT,
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       CREATE TABLE IF NOT EXISTS notifications (
         id SERIAL PRIMARY KEY,
         user_id INTEGER REFERENCES users(id),

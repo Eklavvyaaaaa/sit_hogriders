@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import api from '../services/api';
-import { Plus, Trash2, Save, Users, ToggleLeft, ToggleRight, Loader2, ImagePlus, X } from 'lucide-react';
+import { Plus, Trash2, Save, Users, ToggleLeft, ToggleRight, Loader2, ImagePlus, X, Zap } from 'lucide-react';
 
 const CreateExam = () => {
     const [title, setTitle] = useState('');
@@ -139,6 +139,47 @@ const CreateExam = () => {
         if (!isNaN(parsed) && parsed >= 1) setDuration(parsed);
     };
 
+    const handleAutoFillExam = () => {
+        setTitle('Physics 101 - Core Concepts');
+        setDuration(45);
+        setQuestions([
+            { type: 'mcq', text: 'What is the SI unit of force?', options: ['Joule', 'Newton', 'Watt', 'Pascal'], correctOption: 1, model_answer: '', key_points: [''], image_url: '' },
+            { type: 'mcq', text: 'Which of the following is a scalar quantity?', options: ['Velocity', 'Acceleration', 'Force', 'Speed'], correctOption: 3, model_answer: '', key_points: [''], image_url: '' },
+            { type: 'subjective', text: "Identify and describe Newton's First Law of Motion.", model_answer: "Newton's First Law states that an object will remain at rest or in uniform motion unless acted upon by an external force.", key_points: ['inertia', 'external force', 'uniform motion'], image_url: '' }
+        ]);
+        showToast('Sample exam auto-filled successfully!', 'success');
+    };
+
+    // Quick Create from Question Bank
+    const [quickTitle, setQuickTitle] = useState('');
+    const [quickDuration, setQuickDuration] = useState(30);
+    const [quickMcq, setQuickMcq] = useState(5);
+    const [quickSubj, setQuickSubj] = useState(2);
+    const [quickSubject, setQuickSubject] = useState('');
+    const [quickLoading, setQuickLoading] = useState(false);
+
+    const handleQuickCreate = async () => {
+        if (!quickTitle.trim()) { showToast('Please enter an exam title.', 'error'); return; }
+        if (quickMcq + quickSubj === 0) { showToast('Select at least 1 question.', 'error'); return; }
+        setQuickLoading(true);
+        try {
+            const res = await api.post('/api/questions/generate-exam', {
+                title: quickTitle,
+                duration: quickDuration,
+                mcqCount: quickMcq,
+                subjectiveCount: quickSubj,
+                subject: quickSubject || undefined
+            });
+            setClassroomCode(res.data.classroomCode);
+            showToast(`Exam created with ${res.data.questionsUsed} random questions!`, 'success');
+        } catch (err) {
+            console.error('Quick create error:', err);
+            showToast(err.response?.data?.message || 'Failed to generate exam from bank.', 'error');
+        } finally {
+            setQuickLoading(false);
+        }
+    };
+
     return (
         <div style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }} className="min-h-screen flex flex-col font-inter transition-colors duration-200">
             <Navbar />
@@ -171,11 +212,55 @@ const CreateExam = () => {
                     </div>
                 ) : (
                     <>
-                        <div className="mb-8">
-                            <p style={{ color: 'var(--accent-color)' }} className="text-[11px] font-semibold uppercase tracking-widest mb-1">Teacher Portal</p>
-                            <h1 style={{ color: 'var(--text-primary)' }} className="text-2xl font-bold tracking-tight mb-1">Create New Exam</h1>
-                            <p style={{ color: 'var(--text-secondary)' }} className="text-sm font-medium">Configure exam details and add questions. Supports MCQ, subjective, and image-based questions.</p>
+                        <div className="mb-8 flex justify-between items-start">
+                            <div>
+                                <p style={{ color: 'var(--accent-color)' }} className="text-[11px] font-semibold uppercase tracking-widest mb-1">Teacher Portal</p>
+                                <h1 style={{ color: 'var(--text-primary)' }} className="text-2xl font-bold tracking-tight mb-1">Create New Exam</h1>
+                                <p style={{ color: 'var(--text-secondary)' }} className="text-sm font-medium">Configure exam details and add questions. Supports MCQ, subjective, and image-based questions.</p>
+                            </div>
+                            <button onClick={handleAutoFillExam} className="btn btn-ghost border border-dashed border-gray-300 opacity-60 hover:opacity-100 text-sm">
+                                🧪 Auto-Generate Sample Exam
+                            </button>
                         </div>
+
+                        {/* Quick Create from Question Bank */}
+                        <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="rounded-xl p-6 border shadow-sm mb-6 relative overflow-hidden">
+                            <div style={{ backgroundColor: '#8B5CF6' }} className="absolute inset-x-0 top-0 h-1"></div>
+                            <div className="flex items-center space-x-2 mb-4">
+                                <Zap size={18} style={{ color: '#8B5CF6' }} />
+                                <h3 style={{ color: 'var(--text-primary)' }} className="text-base font-bold">Quick Create from Question Bank</h3>
+                            </div>
+                            <p style={{ color: 'var(--text-secondary)' }} className="text-xs font-medium mb-4">Auto-generate an exam with randomly selected questions from your uploaded CSV bank.</p>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+                                <div className="col-span-2 md:col-span-3">
+                                    <label style={{ color: 'var(--text-muted)' }} className="block text-[10px] font-semibold uppercase tracking-widest mb-1">Exam Title</label>
+                                    <input type="text" className="input-field" placeholder="E.g. Physics Mid-Term" value={quickTitle} onChange={e => setQuickTitle(e.target.value)} />
+                                </div>
+                                <div>
+                                    <label style={{ color: 'var(--text-muted)' }} className="block text-[10px] font-semibold uppercase tracking-widest mb-1">Duration (min)</label>
+                                    <input type="number" min="1" className="input-field" value={quickDuration} onChange={e => setQuickDuration(parseInt(e.target.value) || 1)} />
+                                </div>
+                                <div>
+                                    <label style={{ color: 'var(--text-muted)' }} className="block text-[10px] font-semibold uppercase tracking-widest mb-1"># MCQs</label>
+                                    <input type="number" min="0" className="input-field" value={quickMcq} onChange={e => setQuickMcq(parseInt(e.target.value) || 0)} />
+                                </div>
+                                <div>
+                                    <label style={{ color: 'var(--text-muted)' }} className="block text-[10px] font-semibold uppercase tracking-widest mb-1"># Subjective</label>
+                                    <input type="number" min="0" className="input-field" value={quickSubj} onChange={e => setQuickSubj(parseInt(e.target.value) || 0)} />
+                                </div>
+                                <div className="col-span-2 md:col-span-3">
+                                    <label style={{ color: 'var(--text-muted)' }} className="block text-[10px] font-semibold uppercase tracking-widest mb-1">Subject Filter (optional)</label>
+                                    <input type="text" className="input-field" placeholder="Leave empty for all subjects" value={quickSubject} onChange={e => setQuickSubject(e.target.value)} />
+                                </div>
+                            </div>
+                            <button onClick={handleQuickCreate} disabled={quickLoading} className="btn btn-primary w-full py-3">
+                                {quickLoading ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
+                                <span>{quickLoading ? 'Generating Exam...' : 'Generate Random Exam'}</span>
+                            </button>
+                        </div>
+
+                        <div style={{ borderColor: 'var(--border-color)' }} className="border-t mb-6"></div>
+                        <p style={{ color: 'var(--text-muted)' }} className="text-center text-xs font-medium mb-6 uppercase tracking-widest">— or create manually —</p>
 
                         {/* Exam Details */}
                         <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="rounded-xl p-6 border shadow-sm mb-6 space-y-5">
