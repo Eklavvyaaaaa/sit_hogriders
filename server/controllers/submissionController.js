@@ -300,16 +300,6 @@ async function calculateScores(client, submission_id, exam_id) {
     [submission_id]
   );
 
-  const studentResult = await client.query('SELECT student_id FROM submissions WHERE id = $1', [submission_id]);
-  const student_id = studentResult.rows[0].student_id;
-
-  const violationResult = await client.query(
-    'SELECT violation_count FROM students_exam WHERE student_id = $1 AND exam_id = $2',
-    [student_id, exam_id]
-  );
-  const violationCount = violationResult.rows[0]?.violation_count || 0;
-  const visualScore = Math.max(0, 100 - (violationCount * 10));
-
   // Update the submissions score field natively if we can compute the mcqScore
   let mcqScore = 0;
   let mcqCount = 0;
@@ -340,7 +330,7 @@ async function calculateScores(client, submission_id, exam_id) {
 
       if (modelAnswer && answerText.trim()) {
         try {
-          atiResult = await evaluateATI(answerText, modelAnswer, keyPoints, visualScore);
+          atiResult = await evaluateATI(answerText, modelAnswer, keyPoints);
         } catch (err) {
           console.error(`ATI engine call failed for answer ${ans?.id}:`, err.message);
           atiResult = { content_score: 0, pattern_score: 0, ati_score: 0, trust_level: 'Low Trust' };
