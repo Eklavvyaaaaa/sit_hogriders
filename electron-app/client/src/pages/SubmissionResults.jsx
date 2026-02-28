@@ -80,9 +80,6 @@ const SubmissionResults = () => {
         return 'bg-red-50 border-red-200';
     };
 
-    if (loading) return <div className="h-screen bg-[#f0f7ff] flex items-center justify-center font-bold text-slate-400">Loading results...</div>;
-    if (!detail) return <div className="h-screen bg-[#f0f7ff] flex items-center justify-center font-bold text-slate-400 text-center p-8">Results not found or not yet graded.</div>;
-
     return (
         <div className="min-h-screen bg-white flex flex-col font-inter">
             <Navbar />
@@ -120,7 +117,7 @@ const SubmissionResults = () => {
                                     <span>Trust: {finalGrade.trust_factor}x</span>
                                 </div>
                             </div>
-                        </div>
+                        )}
                     </div>
                 </div>
 
