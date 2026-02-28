@@ -1,142 +1,52 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
-import api from '../services/api';
+import { useChat } from '../context/ChatContext';
 import { MessageSquare, Send, X } from 'lucide-react';
-import { io } from 'socket.io-client';
-import Cookies from 'js-cookie';
 
 const ChatBox = ({ examId }) => {
     const { user } = useContext(AuthContext);
+    const {
+        messagesByExam,
+        unreadCountByExam,
+        fetchChatHistory,
+        joinChatRoom,
+        clearUnreadCount,
+        sendMessage
+    } = useChat();
+
     const [isOpen, setIsOpen] = useState(false);
-    const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
-    const [unreadCount, setUnreadCount] = useState(0);
-    const [isSending, setIsSending] = useState(false);
-    const socketRef = useRef(null);
     const messagesEndRef = useRef(null);
-    const isOpenRef = useRef(false);
 
+    const messages = messagesByExam[examId] || [];
+    const unreadCount = unreadCountByExam[examId] || 0;
+
+    // Join room and fetch history on mount
     useEffect(() => {
-        if (!examId || !user) return;
-
-        // Fetch initial messages
-        const fetchMessages = async () => {
-            try {
-                const res = await api.get(`/chat/${examId}`);
-                setMessages(res.data);
-            } catch (err) {
-                console.error('Failed to fetch messages', err);
-            }
-        };
-        fetchMessages();
-
-        // Connect to socket with JWT auth
-        const token = Cookies.get('token');
-        const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5001', {
-            auth: { token }
-        });
-        socketRef.current = socket;
-
-        // Join chat room after connection (handles initial connect + reconnects)
-        const joinChat = () => {
-            socket.emit('join:chat', examId, (res) => {
-                if (res?.error) console.error('Failed to join chat room:', res.error);
-            });
-        };
-
-        if (socket.connected) {
-            joinChat();
+        if (!examId) return;
+        joinChatRoom(examId);
+        if (messages.length === 0) {
+            fetchChatHistory(examId);
         }
-        socket.on('connect', joinChat);
+    }, [examId, joinChatRoom, fetchChatHistory]);
 
-        socket.on('connect_error', (err) => {
-            console.error('Socket connection error:', err.message);
-        });
-
-        socket.on('receive:message', (msg) => {
-            setMessages(prev => {
-                // Deduplicate by id or by optimistic tempId match
-                if (msg.id && prev.some(m => m.id === msg.id)) return prev;
-                // Replace the optimistic message (same sender + same text + no id)
-                // Note: user.id might be a string from JWT, msg.sender_id is a number from DB
-                const optimisticIdx = prev.findIndex(m =>
-                    !m.id && String(m.sender_id) === String(msg.sender_id) && m.message_text === msg.message_text
-                );
-                if (optimisticIdx !== -1) {
-                    const updated = [...prev];
-                    updated[optimisticIdx] = msg; // Replace with server-confirmed version
-                    return updated;
-                }
-                return [...prev, msg];
-            });
-            if (!isOpenRef.current) {
-                setUnreadCount(prev => prev + 1);
-            }
-        });
-
-        return () => {
-            socket.off('connect');
-            socket.off('connect_error');
-            socket.off('receive:message');
-            socket.disconnect();
-        };
-    }, [examId, user]);
-
+    // Scroll to bottom when new messages arrive or when opening
     useEffect(() => {
-        isOpenRef.current = isOpen;
         if (isOpen) {
-            setUnreadCount(0);
+            clearUnreadCount(examId);
             messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
         }
-    }, [messages, isOpen]);
+    }, [messages, isOpen, examId, clearUnreadCount]);
 
-    const handleSendMessage = async (e) => {
+    const handleSendMessage = (e) => {
         e.preventDefault();
-        if (!newMessage.trim() || isSending) return;
+        if (!newMessage.trim()) return;
 
-        const messageText = newMessage.trim().slice(0, 2000); // Match server's 2000-char limit
-        setNewMessage(''); // Clear input immediately
-
-        // Optimistic: show message instantly (no id = optimistic)
-        const optimisticMsg = {
-            sender_id: user.id,
-            sender_name: user.name,
-            sender_role: user.role,
-            message_text: messageText,
-            exam_id: examId,
-            created_at: new Date().toISOString()
-        };
-        setMessages(prev => [...prev, optimisticMsg]);
-
-        // Send via WebSocket (much faster than HTTP POST)
-        const socket = socketRef.current;
-        if (socket && socket.connected) {
-            socket.emit('send:message', { examId, message: messageText }, (response) => {
-                if (response?.error) {
-                    console.error('Socket send failed:', response.error);
-                    // Remove optimistic message on failure
-                    setMessages(prev => prev.filter(m => m !== optimisticMsg));
-                }
-                // On success, the receive:message broadcast will replace the optimistic message
-            });
-        } else {
-            // Fallback to HTTP if socket is disconnected
-            try {
-                const res = await api.post('/chat', { examId, message: messageText });
-                // Replace optimistic with server response
-                setMessages(prev => {
-                    const idx = prev.indexOf(optimisticMsg);
-                    if (idx !== -1) {
-                        const updated = [...prev];
-                        updated[idx] = res.data;
-                        return updated;
-                    }
-                    return prev;
-                });
-            } catch (err) {
-                console.error('Failed to send message', err);
-                setMessages(prev => prev.filter(m => m !== optimisticMsg));
-            }
+        const success = sendMessage(examId, newMessage.trim().slice(0, 2000));
+        if (success) {
+            setNewMessage('');
+            // Scroll to bottom immediately upon sending
+            setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
         }
     };
 
@@ -182,7 +92,7 @@ const ChatBox = ({ examId }) => {
                             messages.map((msg, idx) => {
                                 const isMine = String(msg.sender_id) === String(user.id);
                                 return (
-                                    <div key={msg.id || `opt-${idx}`} className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}>
+                                    <div key={msg.id || msg.tempId || `opt-${idx}`} className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}>
                                         <span className="text-[10px] text-slate-400 mb-1 px-1 font-bold uppercase tracking-wider">
                                             {isMine ? 'You' : `${msg.sender_name} (${msg.sender_role})`}
                                         </span>
@@ -191,8 +101,8 @@ const ChatBox = ({ examId }) => {
                                             : msg.sender_role === 'teacher'
                                                 ? 'bg-white text-slate-800 border border-slate-200 rounded-tl-sm'
                                                 : 'bg-white text-slate-800 border border-slate-200 rounded-bl-sm'
-                                            } ${!msg.id && isMine ? 'opacity-70' : ''}`}>
-                                            <p className="text-sm leading-relaxed">{msg.message_text}</p>
+                                            } ${msg.tempId ? 'opacity-70' : ''}`}>
+                                            <p className="text-sm leading-relaxed">{msg.message || msg.message_text}</p>
                                         </div>
                                     </div>
                                 );
