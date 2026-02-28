@@ -28,7 +28,17 @@ exports.getStudentHistory = async (req, res) => {
             ORDER BY s.submitted_at DESC NULLS LAST
         `, [studentId]);
 
-        res.json(result.rows);
+        const rows = result.rows.map(row => {
+            let trust_band = 'Not Evaluated';
+            if (row.trust_factor != null) {
+                if (row.trust_factor >= 0.85) trust_band = 'High';
+                else if (row.trust_factor >= 0.6) trust_band = 'Medium';
+                else trust_band = 'Low';
+            }
+            return { ...row, trust_band };
+        });
+
+        res.json(rows);
     } catch (error) {
         console.error('Student history error:', error);
         res.status(500).json({ message: 'Server error' });
@@ -151,6 +161,33 @@ exports.getExamResults = async (req, res) => {
         });
     } catch (error) {
         console.error('Exam results error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// Student: get upcoming (assigned but not submitted, not terminated) exams
+exports.getUpcomingExams = async (req, res) => {
+    try {
+        const studentId = req.user.id;
+
+        const result = await query(`
+            SELECT
+                e.id,
+                e.title,
+                e.duration,
+                e.status,
+                e.created_at
+            FROM students_exam se
+            JOIN exams e ON se.exam_id = e.id
+            WHERE se.student_id = $1
+              AND se.submitted = false
+              AND e.status NOT IN ('terminated', 'completed')
+            ORDER BY e.created_at ASC
+        `, [studentId]);
+
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Upcoming exams error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 };
