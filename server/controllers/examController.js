@@ -598,14 +598,26 @@ exports.extendExam = async (req, res) => {
 // Grant reattempt to a specific student (teacher only)
 exports.grantReattempt = async (req, res) => {
     try {
-        const { examId, studentId } = req.params;
+        const { examId } = req.params;
+        const { email } = req.body;
         const teacherId = req.user.id;
+
+        if (!email) {
+            return res.status(400).json({ message: 'Student email is required' });
+        }
 
         // Verify teacher owns this exam
         const examCheck = await query('SELECT id FROM exams WHERE id = $1 AND teacher_id = $2', [examId, teacherId]);
         if (examCheck.rows.length === 0) {
             return res.status(404).json({ message: 'Exam not found or unauthorized' });
         }
+
+        // Look up student by email
+        const studentCheck = await query('SELECT id FROM users WHERE email = $1 AND role = $2', [email, 'student']);
+        if (studentCheck.rows.length === 0) {
+            return res.status(404).json({ message: 'Student not found with this email' });
+        }
+        const studentId = studentCheck.rows[0].id;
 
         // Update only the latest submitted attempt for this student
         const result = await query(

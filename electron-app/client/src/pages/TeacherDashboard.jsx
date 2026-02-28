@@ -328,9 +328,9 @@ const TeacherDashboard = () => {
                     <>
                         {/* ===== 2. STATS ROW ===== */}
                         {overview && (
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px', marginBottom: '24px' }}>
-                                {statItems.map((stat, i) => (
-                                    <div key={i} style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px 20px', boxShadow: 'var(--stat-shadow)', transition: 'all 0.15s ease' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+                                {statItems.map((stat) => (
+                                    <div key={stat.label} style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px 20px', boxShadow: 'var(--stat-shadow)', transition: 'all 0.15s ease' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                                             <div style={{ backgroundColor: stat.bg, width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                 <stat.icon size={15} style={{ color: stat.color }} />
@@ -522,7 +522,11 @@ const TeacherDashboard = () => {
 
                                                     {/* Menu */}
                                                     <div className="relative">
-                                                        <button onClick={e => { e.stopPropagation(); setMenuOpenId(menuOpenId === exam.id ? null : exam.id); }}
+                                                        <button
+                                                            onClick={e => { e.stopPropagation(); setMenuOpenId(menuOpenId === exam.id ? null : exam.id); }}
+                                                            aria-label={`Open actions menu for ${exam.title}`}
+                                                            aria-haspopup="menu"
+                                                            aria-expanded={menuOpenId === exam.id}
                                                             style={{ color: 'var(--text-muted)', padding: '6px', borderRadius: '8px', background: 'none', border: 'none', cursor: 'pointer', transition: 'opacity 0.15s' }}
                                                             className="hover:opacity-60">
                                                             <MoreVertical size={16} />
@@ -546,7 +550,7 @@ const TeacherDashboard = () => {
                                                                 ].map((item, idx) => {
                                                                     if (item.sep) return <div key={`sep-${idx}`} style={{ borderTop: '1px solid var(--border-color)', margin: '4px 0' }}></div>;
                                                                     return (
-                                                                        <button key={idx} onClick={() => { setMenuOpenId(null); item.action(); }}
+                                                                        <button key={item.label} onClick={() => { setMenuOpenId(null); item.action(); }}
                                                                             style={{ color: item.color, width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 16px', fontSize: '13px', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', transition: 'background 0.1s' }}
                                                                             className="hover:opacity-70">
                                                                             <item.icon size={14} /><span>{item.label}</span>
