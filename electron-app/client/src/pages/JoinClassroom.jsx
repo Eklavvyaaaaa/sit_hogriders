@@ -85,14 +85,14 @@ const JoinClassroom = () => {
     const isComplete = code.join('').length === 6;
 
     return (
-        <div style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }} className="min-h-screen flex flex-col font-inter overflow-hidden transition-colors duration-200">
+        <div style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }} className="h-screen flex flex-col font-inter overflow-hidden transition-colors duration-200">
             <Navbar />
 
             <div className="flex-1 flex overflow-hidden">
                 {/* ── LEFT PANEL ── */}
                 <div style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }} className="hidden lg:flex w-1/2 flex-col relative p-16 justify-between border-r">
-                    <div className="space-y-10">
-                        <div className="space-y-3">
+                    <div className="space-y-10 flex-1 flex flex-col overflow-hidden">
+                        <div className="space-y-3 shrink-0">
                             <p style={{ color: 'var(--accent-color)' }} className="text-[11px] font-black uppercase tracking-widest">Student Portal</p>
                             <h1 style={{ color: 'var(--text-primary)' }} className="text-5xl font-black tracking-tighter leading-tight">Ready to<br />Begin?</h1>
                             <p style={{ color: 'var(--text-secondary)' }} className="text-lg font-medium leading-relaxed max-w-sm">
@@ -101,7 +101,7 @@ const JoinClassroom = () => {
                         </div>
 
                         {/* Exam History Section */}
-                        <div className="space-y-3">
+                        <div className="flex flex-col flex-1 overflow-hidden">
                             <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Past Exam Results</p>
 
                             {historyLoading ? (
@@ -128,11 +128,11 @@ const JoinClassroom = () => {
                                     </button>
                                 </div>
                             ) : pastExams.length === 0 ? (
-                                <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="p-6 rounded-xl border text-center">
+                                <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="p-6 rounded-xl border text-center mt-3">
                                     <p style={{ color: 'var(--text-muted)' }} className="text-sm font-medium">No past exams found.</p>
                                 </div>
                             ) : (
-                                <div className="space-y-3">
+                                <div className="space-y-3 overflow-y-auto flex-1 pr-2 mt-3 pb-8">
                                     {pastExams.map((exam, index) => {
                                         const isGraded = exam.final_score != null;
                                         const finalScore = isGraded ? Math.round(exam.final_score) : null;
