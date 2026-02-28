@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import api from '../services/api';
-import { Shield, ChevronRight, Calendar, BookOpen, Clock, Loader2, AlertTriangle } from 'lucide-react';
+import { Shield, ChevronRight, Calendar, BookOpen, Clock, Loader2, AlertTriangle, History } from 'lucide-react';
 
 const JoinClassroom = () => {
     const [code, setCode] = useState(['', '', '', '', '', '']);
@@ -21,9 +21,8 @@ const JoinClassroom = () => {
             try {
                 setHistoryLoading(true);
                 setHistoryError(null);
-                const res = await api.get('/history/student');
-                // Limit to most recent 5 exams
-                setPastExams(res.data.slice(0, 5));
+                const res = await api.get('/history/student?limit=2');
+                setPastExams(res.data?.data || []);
             } catch (err) {
                 console.error('Failed to fetch exam history', err);
                 setHistoryError('Failed to load past exams.');
@@ -101,7 +100,7 @@ const JoinClassroom = () => {
                         </div>
 
                         {/* Exam History Section */}
-                        <div className="space-y-3">
+                        <div className="flex flex-col">
                             <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Past Exam Results</p>
 
                             {historyLoading ? (
@@ -117,8 +116,8 @@ const JoinClassroom = () => {
                                         onClick={() => {
                                             setHistoryLoading(true);
                                             setHistoryError(null);
-                                            api.get('/history/student')
-                                                .then(res => setPastExams(res.data.slice(0, 5)))
+                                            api.get('/history/student?limit=2')
+                                                .then(res => setPastExams(res.data?.data || []))
                                                 .catch(() => setHistoryError('Failed to load past exams.'))
                                                 .finally(() => setHistoryLoading(false));
                                         }}
@@ -132,7 +131,7 @@ const JoinClassroom = () => {
                                     <p className="text-slate-500 text-sm font-medium">No past exams found.</p>
                                 </div>
                             ) : (
-                                <div className="space-y-3">
+                                <div className="space-y-3 mt-3">
                                     {pastExams.map((exam, index) => {
                                         const isGraded = exam.final_score != null;
                                         const finalScore = isGraded ? Math.round(exam.final_score) : null;
@@ -166,8 +165,8 @@ const JoinClassroom = () => {
                                                 onClick={() => { if (canNavigate) navigate(`/history/submission/${exam.submission_id}`); }}
                                                 disabled={!canNavigate}
                                                 className={`group relative flex items-center justify-between bg-white rounded-2xl p-5 border border-slate-200 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] transition-all duration-300 overflow-hidden text-left w-full ${canNavigate
-                                                        ? 'hover:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.1)] hover:border-blue-300 cursor-pointer'
-                                                        : 'opacity-70 cursor-default'
+                                                    ? 'hover:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.1)] hover:border-blue-300 cursor-pointer'
+                                                    : 'opacity-70 cursor-default'
                                                     }`}
                                             >
                                                 {/* Left structural visual */}
@@ -221,6 +220,14 @@ const JoinClassroom = () => {
                                             </button>
                                         );
                                     })}
+                                    <button
+                                        onClick={() => navigate('/history')}
+                                        style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)', color: 'var(--accent-color)' }}
+                                        className="w-full flex items-center justify-center space-x-2 py-3 mt-2 rounded-xl border font-bold text-sm hover:opacity-80 transition-opacity"
+                                    >
+                                        <History size={16} />
+                                        <span>View Full History</span>
+                                    </button>
                                 </div>
                             )}
                         </div>

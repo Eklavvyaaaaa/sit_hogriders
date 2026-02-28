@@ -15,7 +15,7 @@ router.patch('/:id/terminate', authMiddleware('teacher'), terminateExam);
 router.patch('/:id/reschedule', authMiddleware('teacher'), rescheduleExam);
 router.patch('/:id/stop', authMiddleware('teacher'), stopExam);
 router.patch('/:id/extend', authMiddleware('teacher'), extendExam);
-router.patch('/:examId/grant/:studentId', authMiddleware('teacher'), grantReattempt);
+router.patch('/:examId/grant', authMiddleware('teacher'), grantReattempt);
 router.delete('/:id', authMiddleware('teacher'), deleteExam);
 
 module.exports = router;

@@ -25,6 +25,7 @@ const ExamPage = () => {
     const [textAnswers, setTextAnswers] = useState({});
     const [isSubmitted, setIsSubmitted] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submissionId, setSubmissionId] = useState(null);
     const [hasStarted, setHasStarted] = useState(false);
     const [violationCount, setViolationCount] = useState(0);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -59,6 +60,7 @@ const ExamPage = () => {
             unregisterLocalStream();
         };
     }, [examData, navigate, registerLocalStream, unregisterLocalStream]);
+
 
     const handleStartExam = () => {
         ignoreNextBlur.current = true;
@@ -128,7 +130,8 @@ const ExamPage = () => {
                     combinedAnswers[index] = { type: 'mcq', selected: answers[index] };
                 }
             });
-            await api.post('/exam/submit', { examId: examData.examId, answers: combinedAnswers, score });
+            const res = await api.post('/exam/submit', { examId: examData.examId, answers: combinedAnswers, score });
+            setSubmissionId(res.data?.submissionId || null);
             setIsSubmitted(true);
             if (streamRef.current) { streamRef.current.getTracks().forEach(t => { t.stop(); }); streamRef.current = null; }
             if (window.electronAPI) window.electronAPI.deactivateLock();
@@ -152,8 +155,11 @@ const ExamPage = () => {
                         <CheckCircle2 size={40} style={{ color: 'var(--success-color)' }} />
                     </div>
                     <h2 style={{ color: 'var(--text-primary)' }} className="text-2xl font-bold mb-4">Assessment Complete</h2>
-                    <p style={{ color: 'var(--text-secondary)' }} className="mb-10 leading-relaxed font-medium text-sm">Your responses have been successfully recorded. Results will be released by your instructor.</p>
-                    <button onClick={() => window.electronAPI ? window.close() : navigate('/')} className="btn btn-primary w-full py-3">
+                    <p style={{ color: 'var(--text-secondary)' }} className="mb-10 leading-relaxed font-medium text-sm">Your responses have been successfully recorded and graded.</p>
+                    <button onClick={() => submissionId ? navigate(`/results/${submissionId}`) : navigate('/history')} className="btn btn-primary w-full py-3">
+                        View Results
+                    </button>
+                    <button onClick={() => navigate('/join')} style={{ color: 'var(--text-secondary)' }} className="mt-3 w-full py-2 text-sm font-medium hover:opacity-80 transition-opacity">
                         Return to Dashboard
                     </button>
                 </div>
@@ -312,21 +318,7 @@ const ExamPage = () => {
                 Notice: Switching tabs, windows, or using shortcuts is strictly prohibited and logged in real-time.
             </div>
 
-            {/* Grant Reattempt Modal */}
-            {showGrantModal && (
-                <div style={{ backgroundColor: 'var(--modal-overlay)' }} className="fixed inset-0 flex items-center justify-center z-[100]" onClick={() => setShowGrantModal(false)}>
-                    <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="rounded-xl p-6 shadow-2xl w-full max-w-sm mx-4 border" onClick={e => e.stopPropagation()}>
-                        <h3 style={{ color: 'var(--text-primary)' }} className="text-lg font-semibold mb-4">Grant Reattempt</h3>
-                        <input autoFocus type="text" value={grantStudentId} onChange={e => setGrantStudentId(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter') handleGrantReattempt(); }}
-                            placeholder="Enter Student ID" className="input-field mb-4" />
-                        <div className="flex space-x-3">
-                            <button onClick={() => { setShowGrantModal(false); setGrantStudentId(''); }} className="btn btn-ghost flex-1">Cancel</button>
-                            <button onClick={handleGrantReattempt} className="btn btn-primary flex-1">Submit</button>
-                        </div>
-                    </div>
-                </div>
-            )}
+
 
             {/* Confirm Modal */}
             {confirmModal && (
