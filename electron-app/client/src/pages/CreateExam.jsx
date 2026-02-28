@@ -1,26 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import api from '../services/api';
-import { Plus, Trash2, Save, Users, ToggleLeft, ToggleRight, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Save, Users, ToggleLeft, ToggleRight, Loader2, ImagePlus, X } from 'lucide-react';
 
 const CreateExam = () => {
     const [title, setTitle] = useState('');
     const [duration, setDuration] = useState(60);
     const [isSaving, setIsSaving] = useState(false);
     const [questions, setQuestions] = useState([
-        { text: '', type: 'mcq', options: ['', '', '', ''], correctOption: 0, model_answer: '', key_points: [''] }
+        { text: '', type: 'mcq', options: ['', '', '', ''], correctOption: 0, model_answer: '', key_points: [''], image_url: '' }
     ]);
     const [classroomCode, setClassroomCode] = useState(null);
-
+    const [toast, setToast] = useState(null);
+    const toastTimerRef = useRef(null);
     const navigate = useNavigate();
+
+    const showToast = (message, type = 'error') => {
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        setToast({ message, type });
+        toastTimerRef.current = setTimeout(() => { setToast(null); toastTimerRef.current = null; }, 3500);
+    };
 
     const addQuestion = (type = 'mcq') => {
         setQuestions(prev => {
             if (type === 'subjective') {
-                return [...prev, { text: '', type: 'subjective', model_answer: '', key_points: [''] }];
+                return [...prev, { text: '', type: 'subjective', model_answer: '', key_points: [''], image_url: '' }];
             } else {
-                return [...prev, { text: '', type: 'mcq', options: ['', '', '', ''], correctOption: 0, model_answer: '', key_points: [''] }];
+                return [...prev, { text: '', type: 'mcq', options: ['', '', '', ''], correctOption: 0, model_answer: '', key_points: [''], image_url: '' }];
             }
         });
     };
@@ -32,20 +39,13 @@ const CreateExam = () => {
                 return { ...q, type: 'subjective', model_answer: q.model_answer || '', key_points: q.key_points || [''] };
             } else {
                 const { model_answer, key_points, ...rest } = q;
-                return {
-                    ...rest,
-                    type: 'mcq',
-                    options: q.options || ['', '', '', ''],
-                    correctOption: q.correctOption !== undefined ? q.correctOption : 0
-                };
+                return { ...rest, type: 'mcq', options: q.options || ['', '', '', ''], correctOption: q.correctOption !== undefined ? q.correctOption : 0 };
             }
         }));
     };
 
     const updateQuestion = (index, field, value) => {
-        setQuestions(prev => prev.map((q, i) =>
-            i === index ? { ...q, [field]: value } : q
-        ));
+        setQuestions(prev => prev.map((q, i) => i === index ? { ...q, [field]: value } : q));
     };
 
     const updateQuestionOption = (qIndex, oIndex, value) => {
@@ -84,16 +84,35 @@ const CreateExam = () => {
         setQuestions(prev => prev.filter((_, i) => i !== index));
     };
 
+    const handleImageUpload = (qIndex, e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+            showToast('Only image files are allowed.', 'error');
+            return;
+        }
+        if (file.size > 2 * 1024 * 1024) {
+            showToast('Image must be under 2MB.', 'error');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+            updateQuestion(qIndex, 'image_url', reader.result);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const removeImage = (qIndex) => {
+        updateQuestion(qIndex, 'image_url', '');
+    };
+
     const isFormValid = () => {
         if (!title) return false;
         if (!Number.isInteger(duration) || duration < 1) return false;
         return questions.every(q => {
             if (!q.text) return false;
-            if (q.type === 'mcq') {
-                return q.options && q.options.every(o => o.trim() !== '');
-            } else {
-                return q.model_answer && q.model_answer.trim() !== '';
-            }
+            if (q.type === 'mcq') return q.options && q.options.every(o => o.trim() !== '');
+            else return q.model_answer && q.model_answer.trim() !== '';
         });
     };
 
@@ -107,7 +126,7 @@ const CreateExam = () => {
             setClassroomCode(classRes.data.code);
         } catch (err) {
             console.error(err);
-            alert('Failed to create exam');
+            showToast('Failed to create exam', 'error');
         } finally {
             setIsSaving(false);
         }
@@ -121,164 +140,152 @@ const CreateExam = () => {
     };
 
     return (
-        <div className="min-h-screen bg-white flex flex-col font-inter">
+        <div style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }} className="min-h-screen flex flex-col font-inter transition-colors duration-200">
             <Navbar />
-            <div className="flex-1 max-w-4xl w-full mx-auto p-8">
 
+            {/* Toast */}
+            {toast && (
+                <div className="toast-container">
+                    <div className={`toast toast-${toast.type} flex items-center justify-between`}>
+                        <span>{toast.message}</span>
+                        <button onClick={() => setToast(null)} className="ml-3 opacity-70 hover:opacity-100"><X size={14} /></button>
+                    </div>
+                </div>
+            )}
+
+            <div className="flex-1 max-w-4xl w-full mx-auto px-6 py-8 lg:px-8">
                 {classroomCode ? (
-                    <div className="bg-white p-10 rounded-2xl text-center shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] border border-slate-200 relative overflow-hidden">
-                        <div className="absolute inset-x-0 top-0 h-1.5 bg-blue-600"></div>
-                        <div className="w-16 h-16 bg-blue-50 rounded-xl flex items-center justify-center mx-auto mb-6">
-                            <Users size={32} className="text-blue-600" />
+                    <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="p-10 rounded-xl text-center shadow-sm border relative overflow-hidden">
+                        <div style={{ backgroundColor: 'var(--accent-color)' }} className="absolute inset-x-0 top-0 h-1"></div>
+                        <div style={{ backgroundColor: 'var(--accent-light)' }} className="w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-6">
+                            <Users size={32} style={{ color: 'var(--accent-color)' }} />
                         </div>
-                        <h2 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Classroom Generated!</h2>
-                        <p className="text-slate-500 mb-8 font-medium">Share this code with your students to let them join the exam.</p>
-
-                        <div className="bg-slate-50 inline-block px-10 py-5 rounded-xl border border-slate-200 mb-8">
-                            <span className="text-5xl font-mono tracking-[0.5em] text-blue-600 font-black">{classroomCode}</span>
+                        <h2 style={{ color: 'var(--text-primary)' }} className="text-2xl font-bold tracking-tight mb-2">Classroom Generated!</h2>
+                        <p style={{ color: 'var(--text-secondary)' }} className="mb-8 font-medium text-sm">Share this code with your students to let them join the exam.</p>
+                        <div style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }} className="inline-block px-10 py-5 rounded-xl border mb-8">
+                            <span style={{ color: 'var(--accent-color)' }} className="text-5xl font-mono tracking-[0.5em] font-bold">{classroomCode}</span>
                         </div>
                         <div>
-                            <button
-                                onClick={() => navigate('/teacher')}
-                                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-xl shadow-blue-200 transition-all active:scale-[0.98]"
-                            >
-                                Back to Dashboard
-                            </button>
+                            <button onClick={() => navigate('/teacher')} className="btn btn-primary">Back to Dashboard</button>
                         </div>
                     </div>
                 ) : (
                     <>
                         <div className="mb-8">
-                            <p className="text-[11px] font-black text-blue-600 uppercase tracking-widest mb-1">Teacher Portal</p>
-                            <h1 className="text-3xl font-black text-slate-900 tracking-tighter mb-1">Create New Exam</h1>
-                            <p className="text-slate-500 text-sm font-medium">Configure exam details and add questions. Supports both MCQ and subjective questions.</p>
+                            <p style={{ color: 'var(--accent-color)' }} className="text-[11px] font-semibold uppercase tracking-widest mb-1">Teacher Portal</p>
+                            <h1 style={{ color: 'var(--text-primary)' }} className="text-2xl font-bold tracking-tight mb-1">Create New Exam</h1>
+                            <p style={{ color: 'var(--text-secondary)' }} className="text-sm font-medium">Configure exam details and add questions. Supports MCQ, subjective, and image-based questions.</p>
                         </div>
 
                         {/* Exam Details */}
-                        <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] mb-6 space-y-5">
+                        <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="rounded-xl p-6 border shadow-sm mb-6 space-y-5">
                             <div>
-                                <label className="block text-[11px] text-slate-500 font-black uppercase tracking-widest mb-2">Exam Title</label>
-                                <input
-                                    type="text"
-                                    className="w-full p-3.5 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-blue-600 focus:bg-white focus:ring-0 transition-all text-slate-900 placeholder-slate-400 font-medium"
-                                    placeholder="E.g. Final Computer Science Midterm"
-                                    value={title}
-                                    onChange={e => setTitle(e.target.value)}
-                                />
+                                <label style={{ color: 'var(--text-muted)' }} className="block text-[11px] font-semibold uppercase tracking-widest mb-2">Exam Title</label>
+                                <input type="text" className="input-field" placeholder="E.g. Final Computer Science Midterm" value={title} onChange={e => setTitle(e.target.value)} />
                             </div>
                             <div>
-                                <label className="block text-[11px] text-slate-500 font-black uppercase tracking-widest mb-2">Duration (minutes)</label>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    step="1"
-                                    className="w-full p-3.5 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-blue-600 focus:bg-white focus:ring-0 transition-all text-slate-900 placeholder-slate-400 font-medium"
-                                    value={duration}
-                                    onChange={handleDurationChange}
-                                />
+                                <label style={{ color: 'var(--text-muted)' }} className="block text-[11px] font-semibold uppercase tracking-widest mb-2">Duration (minutes)</label>
+                                <input type="number" min="1" step="1" className="input-field" value={duration} onChange={handleDurationChange} />
                             </div>
                         </div>
 
                         {/* Questions */}
                         <div className="space-y-5">
                             {questions.map((q, qIndex) => (
-                                <div key={qIndex} className="bg-white rounded-xl p-6 border border-slate-200 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] relative">
+                                <div key={qIndex} style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="rounded-xl p-6 border shadow-sm relative">
                                     <div className="flex justify-between items-start mb-4">
                                         <div className="flex items-center space-x-3">
-                                            <h3 className="text-base font-black text-slate-900">Question {qIndex + 1}</h3>
-                                            <button
-                                                onClick={() => toggleQuestionType(qIndex)}
-                                                className={`flex items-center space-x-1.5 px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-widest transition-colors border ${q.type === 'subjective'
-                                                    ? 'bg-indigo-50 text-indigo-600 border-indigo-200'
-                                                    : 'bg-blue-50 text-blue-600 border-blue-200'
-                                                    }`}
-                                            >
+                                            <h3 style={{ color: 'var(--text-primary)' }} className="text-base font-semibold">Question {qIndex + 1}</h3>
+                                            <button onClick={() => toggleQuestionType(qIndex)}
+                                                className={`flex items-center space-x-1.5 px-3 py-1 rounded-md text-[10px] font-semibold uppercase tracking-widest transition-colors border ${q.type === 'subjective' ? 'bg-purple-50 text-purple-600 border-purple-200' : 'bg-blue-50 text-blue-600 border-blue-200'}`}>
                                                 {q.type === 'subjective' ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
                                                 <span>{q.type === 'subjective' ? 'Subjective' : 'MCQ'}</span>
                                             </button>
                                         </div>
                                         {questions.length > 1 && (
-                                            <button
-                                                onClick={() => removeQuestion(qIndex)}
-                                                className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
-                                                aria-label={`Delete question ${qIndex + 1}`}
-                                                title={`Delete question ${qIndex + 1}`}
-                                            >
+                                            <button onClick={() => removeQuestion(qIndex)} style={{ color: 'var(--danger-color)' }}
+                                                className="p-1.5 rounded-lg hover:opacity-70 transition-colors" aria-label={`Delete question ${qIndex + 1}`}>
                                                 <Trash2 size={16} />
                                             </button>
                                         )}
                                     </div>
 
-                                    <textarea
-                                        className="w-full p-3.5 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-blue-600 focus:bg-white focus:ring-0 transition-all text-slate-900 placeholder-slate-400 font-medium mb-4 min-h-[90px]"
-                                        placeholder="Enter question text..."
-                                        value={q.text}
-                                        onChange={e => updateQuestion(qIndex, 'text', e.target.value)}
-                                    />
+                                    <textarea className="input-field mb-4 min-h-[90px]" placeholder="Enter question text..."
+                                        value={q.text} onChange={e => updateQuestion(qIndex, 'text', e.target.value)} />
+
+                                    {/* Image Upload */}
+                                    <div className="mb-4">
+                                        {q.image_url ? (
+                                            <div className="relative inline-block">
+                                                <img src={q.image_url} alt={`Question ${qIndex + 1} attachment`}
+                                                    className="max-w-full max-h-48 rounded-lg border" style={{ borderColor: 'var(--border-color)' }} />
+                                                <button onClick={() => removeImage(qIndex)}
+                                                    className="absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-white"
+                                                    style={{ backgroundColor: 'var(--danger-color)' }} title="Remove image">
+                                                    <X size={12} />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <label style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
+                                                className="inline-flex items-center space-x-2 px-4 py-2 rounded-lg border border-dashed cursor-pointer hover:opacity-70 transition-colors text-xs font-medium">
+                                                <ImagePlus size={14} />
+                                                <span>Attach Image (optional)</span>
+                                                <input type="file" accept="image/*" className="hidden" onChange={e => handleImageUpload(qIndex, e)} />
+                                            </label>
+                                        )}
+                                    </div>
 
                                     {q.type === 'mcq' ? (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                            {q.options.map((opt, oIndex) => (
-                                                <div key={oIndex} className="flex items-center space-x-2.5">
-                                                    <input
-                                                        type="radio"
-                                                        name={`correct-${qIndex}`}
-                                                        checked={q.correctOption === oIndex}
-                                                        onChange={() => updateQuestion(qIndex, 'correctOption', oIndex)}
-                                                        className="w-4 h-4 text-blue-600 bg-white border-slate-300 focus:ring-blue-500"
-                                                    />
-                                                    <input
-                                                        type="text"
-                                                        className="flex-1 p-2.5 bg-slate-50 border-2 border-slate-100 rounded-lg focus:border-blue-600 focus:bg-white focus:ring-0 transition-all text-slate-900 text-sm font-medium placeholder-slate-400"
-                                                        placeholder={`Option ${oIndex + 1}`}
-                                                        value={opt}
-                                                        onChange={e => updateQuestionOption(qIndex, oIndex, e.target.value)}
-                                                    />
-                                                </div>
-                                            ))}
+                                        <div className="space-y-3">
+                                            <label className="block text-[10px] text-slate-400 font-black mb-2 uppercase tracking-widest">Options (Select the correct answer)</label>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                {q.options.map((opt, oIndex) => (
+                                                    <div key={oIndex} className={`flex items-center space-x-2.5 p-2 rounded-lg border-2 transition-all ${q.correctOption === oIndex ? 'border-blue-500 bg-blue-50/50' : 'border-transparent'}`}>
+                                                        <input
+                                                            type="radio"
+                                                            name={`correct-${qIndex}`}
+                                                            checked={q.correctOption === oIndex}
+                                                            onChange={() => updateQuestion(qIndex, 'correctOption', oIndex)}
+                                                            className="w-5 h-5 text-blue-600 bg-white border-slate-300 focus:ring-blue-500 cursor-pointer"
+                                                            title={`Mark Option ${oIndex + 1} as Correct`}
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            className={`flex-1 p-2.5 bg-slate-50 border-2 rounded-lg focus:border-blue-600 focus:bg-white focus:ring-0 transition-all text-sm font-medium placeholder-slate-400 ${q.correctOption === oIndex ? 'border-blue-200 text-blue-900' : 'border-slate-100 text-slate-900'}`}
+                                                            placeholder={`Option ${oIndex + 1}`}
+                                                            value={opt}
+                                                            onChange={e => updateQuestionOption(qIndex, oIndex, e.target.value)}
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
                                     ) : (
                                         <div className="space-y-4">
                                             <div>
-                                                <label className="block text-[10px] text-slate-400 font-black mb-2 uppercase tracking-widest">Model Answer</label>
-                                                <textarea
-                                                    className="w-full p-3.5 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 focus:bg-white focus:ring-0 transition-all text-slate-900 font-medium min-h-[80px] placeholder-slate-400"
-                                                    placeholder="Enter the ideal/expected answer..."
-                                                    value={q.model_answer}
-                                                    onChange={e => updateQuestion(qIndex, 'model_answer', e.target.value)}
-                                                />
+                                                <label style={{ color: 'var(--text-muted)' }} className="block text-[10px] font-semibold mb-2 uppercase tracking-widest">Model Answer</label>
+                                                <textarea className="input-field min-h-[80px]" placeholder="Enter the ideal/expected answer..."
+                                                    value={q.model_answer} onChange={e => updateQuestion(qIndex, 'model_answer', e.target.value)} />
                                             </div>
                                             <div>
-                                                <label className="block text-[10px] text-slate-400 font-black mb-2 uppercase tracking-widest">Key Points</label>
+                                                <label style={{ color: 'var(--text-muted)' }} className="block text-[10px] font-semibold mb-2 uppercase tracking-widest">Key Points</label>
                                                 <div className="space-y-2">
                                                     {q.key_points.map((kp, kpIndex) => (
                                                         <div key={kpIndex} className="flex items-center space-x-2">
-                                                            <span className="text-indigo-500 text-xs font-mono w-5 font-black">{kpIndex + 1}.</span>
-                                                            <input
-                                                                type="text"
-                                                                className="flex-1 p-2.5 bg-slate-50 border-2 border-slate-100 rounded-lg focus:border-indigo-500 focus:bg-white focus:ring-0 transition-all text-slate-900 text-sm font-medium placeholder-slate-400"
-                                                                placeholder={`Key point ${kpIndex + 1}`}
-                                                                value={kp}
-                                                                onChange={e => updateKeyPoint(qIndex, kpIndex, e.target.value)}
-                                                            />
+                                                            <span style={{ color: 'var(--accent-color)' }} className="text-xs font-mono w-5 font-semibold">{kpIndex + 1}.</span>
+                                                            <input type="text" className="input-field" placeholder={`Key point ${kpIndex + 1}`}
+                                                                value={kp} onChange={e => updateKeyPoint(qIndex, kpIndex, e.target.value)} />
                                                             {q.key_points.length > 1 && (
-                                                                <button
-                                                                    onClick={() => removeKeyPoint(qIndex, kpIndex)}
-                                                                    className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"
-                                                                    aria-label={`Remove key point ${kpIndex + 1} from question ${qIndex + 1}`}
-                                                                    title={`Remove key point ${kpIndex + 1}`}
-                                                                >
+                                                                <button onClick={() => removeKeyPoint(qIndex, kpIndex)} style={{ color: 'var(--danger-color)' }}
+                                                                    className="p-1 rounded hover:opacity-70 transition-colors" aria-label={`Remove key point ${kpIndex + 1}`}>
                                                                     <Trash2 size={14} />
                                                                 </button>
                                                             )}
                                                         </div>
                                                     ))}
-                                                    <button
-                                                        onClick={() => addKeyPoint(qIndex)}
-                                                        className="text-indigo-600 hover:text-indigo-700 text-xs font-bold flex items-center space-x-1 mt-1"
-                                                    >
-                                                        <Plus size={12} />
-                                                        <span>Add Key Point</span>
+                                                    <button onClick={() => addKeyPoint(qIndex)} style={{ color: 'var(--accent-color)' }}
+                                                        className="text-xs font-semibold flex items-center space-x-1 mt-1 hover:opacity-80">
+                                                        <Plus size={12} /><span>Add Key Point</span>
                                                     </button>
                                                 </div>
                                             </div>
@@ -291,29 +298,15 @@ const CreateExam = () => {
                         {/* Bottom Actions */}
                         <div className="mt-8 flex justify-between">
                             <div className="flex space-x-3">
-                                <button
-                                    onClick={() => addQuestion('mcq')}
-                                    className="flex items-center space-x-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-3 rounded-lg font-bold transition-colors text-sm"
-                                >
-                                    <Plus size={18} />
-                                    <span>Add MCQ</span>
+                                <button onClick={() => addQuestion('mcq')} className="btn btn-ghost">
+                                    <Plus size={16} /><span>Add MCQ</span>
                                 </button>
-                                <button
-                                    onClick={() => addQuestion('subjective')}
-                                    className="flex items-center space-x-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-5 py-3 rounded-lg font-bold transition-colors border border-indigo-200 text-sm"
-                                >
-                                    <Plus size={18} />
-                                    <span>Add Subjective</span>
+                                <button onClick={() => addQuestion('subjective')} className="btn btn-secondary">
+                                    <Plus size={16} /><span>Add Subjective</span>
                                 </button>
                             </div>
-
-                            <button
-                                onClick={handleSave}
-                                disabled={!isFormValid() || isSaving}
-                                aria-busy={isSaving}
-                                className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white px-8 py-3 rounded-full font-black shadow-xl shadow-blue-200 transition-all active:scale-[0.98]"
-                            >
-                                {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                            <button onClick={handleSave} disabled={!isFormValid() || isSaving} className="btn btn-primary" aria-busy={isSaving}>
+                                {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                                 <span>{isSaving ? 'Saving...' : 'Save & Generate Code'}</span>
                             </button>
                         </div>
