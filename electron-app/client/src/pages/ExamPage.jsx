@@ -312,21 +312,7 @@ const ExamPage = () => {
                 Notice: Switching tabs, windows, or using shortcuts is strictly prohibited and logged in real-time.
             </div>
 
-            {/* Grant Reattempt Modal */}
-            {showGrantModal && (
-                <div style={{ backgroundColor: 'var(--modal-overlay)' }} className="fixed inset-0 flex items-center justify-center z-[100]" onClick={() => setShowGrantModal(false)}>
-                    <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="rounded-xl p-6 shadow-2xl w-full max-w-sm mx-4 border" onClick={e => e.stopPropagation()}>
-                        <h3 style={{ color: 'var(--text-primary)' }} className="text-lg font-semibold mb-4">Grant Reattempt</h3>
-                        <input autoFocus type="text" value={grantStudentId} onChange={e => setGrantStudentId(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter') handleGrantReattempt(); }}
-                            placeholder="Enter Student ID" className="input-field mb-4" />
-                        <div className="flex space-x-3">
-                            <button onClick={() => { setShowGrantModal(false); setGrantStudentId(''); }} className="btn btn-ghost flex-1">Cancel</button>
-                            <button onClick={handleGrantReattempt} className="btn btn-primary flex-1">Submit</button>
-                        </div>
-                    </div>
-                </div>
-            )}
+
 
             {/* Confirm Modal */}
             {confirmModal && (
