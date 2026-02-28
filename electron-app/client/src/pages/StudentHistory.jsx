@@ -109,8 +109,8 @@ const StudentHistory = () => {
                                     </div>
                                     <div className="mt-auto">
                                         <span className={`text-[10px] px-2 py-1 rounded-md border font-black uppercase tracking-widest capitalize ${exam.status === 'active'
-                                                ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
-                                                : 'bg-amber-50 text-amber-600 border-amber-200'
+                                            ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                                            : 'bg-amber-50 text-amber-600 border-amber-200'
                                             }`}>
                                             {exam.status || 'scheduled'}
                                         </span>
@@ -151,6 +151,7 @@ const StudentHistory = () => {
                                 <ArrowUpDown size={14} className="text-slate-400" />
                                 <select
                                     id="sort-field"
+                                    aria-label="Sort by field"
                                     value={sortField}
                                     onChange={e => setSortField(e.target.value)}
                                     className="text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -160,6 +161,7 @@ const StudentHistory = () => {
                                 </select>
                                 <select
                                     id="sort-order"
+                                    aria-label="Sort order"
                                     value={sortOrder}
                                     onChange={e => setSortOrder(e.target.value)}
                                     className="text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -172,6 +174,7 @@ const StudentHistory = () => {
                                 <Filter size={14} className="text-slate-400" />
                                 <select
                                     id="status-filter"
+                                    aria-label="Filter by status"
                                     value={statusFilter}
                                     onChange={e => setStatusFilter(e.target.value)}
                                     className="text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
