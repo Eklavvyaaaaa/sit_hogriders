@@ -38,9 +38,16 @@ const ChatBox = ({ examId }) => {
         socketRef.current = socket;
 
         // Join chat room after connection (handles initial connect + reconnects)
-        socket.on('connect', () => {
-            socket.emit('join:chat', examId);
-        });
+        const joinChat = () => {
+            socket.emit('join:chat', examId, (res) => {
+                if (res?.error) console.error('Failed to join chat room:', res.error);
+            });
+        };
+
+        if (socket.connected) {
+            joinChat();
+        }
+        socket.on('connect', joinChat);
 
         socket.on('connect_error', (err) => {
             console.error('Socket connection error:', err.message);
@@ -51,8 +58,9 @@ const ChatBox = ({ examId }) => {
                 // Deduplicate by id or by optimistic tempId match
                 if (msg.id && prev.some(m => m.id === msg.id)) return prev;
                 // Replace the optimistic message (same sender + same text + no id)
+                // Note: user.id might be a string from JWT, msg.sender_id is a number from DB
                 const optimisticIdx = prev.findIndex(m =>
-                    !m.id && m.sender_id === msg.sender_id && m.message_text === msg.message_text
+                    !m.id && String(m.sender_id) === String(msg.sender_id) && m.message_text === msg.message_text
                 );
                 if (optimisticIdx !== -1) {
                     const updated = [...prev];
@@ -172,7 +180,7 @@ const ChatBox = ({ examId }) => {
                             </div>
                         ) : (
                             messages.map((msg, idx) => {
-                                const isMine = msg.sender_id === user.id;
+                                const isMine = String(msg.sender_id) === String(user.id);
                                 return (
                                     <div key={msg.id || `opt-${idx}`} className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}>
                                         <span className="text-[10px] text-slate-400 mb-1 px-1 font-bold uppercase tracking-wider">
