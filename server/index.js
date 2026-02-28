@@ -41,9 +41,16 @@ app.use('/chat', chatRoutes);
 app.use('/api/questions', questionBankRoutes);
 app.use('/notifications', notificationRoutes);
 
+const fs = require('fs');
+
 // Database initialization & Server start
 const startServer = async () => {
   try {
+    // Ensure the uploads directory exists for Multer
+    if (!fs.existsSync('uploads/')) {
+      fs.mkdirSync('uploads/', { recursive: true });
+    }
+
     await initDB();
     server.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);

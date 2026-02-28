@@ -22,4 +22,20 @@ router.post('/upload', authMiddleware(['teacher']), upload.single('file'), uploa
 router.get('/', authMiddleware(['teacher']), getQuestions);
 router.post('/generate-exam', authMiddleware(['teacher']), generateExamFromBank);
 
+// Error-handling middleware for Multer
+router.use((err, req, res, next) => {
+    if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ message: 'File is too large. Maximum size is 5MB.' });
+        }
+        return res.status(400).json({ message: `Multer error: ${err.message}` });
+    } else if (err) {
+        if (err.message === 'Only CSV files are allowed!') {
+            return res.status(400).json({ message: err.message });
+        }
+        return next(err);
+    }
+    next();
+});
+
 module.exports = router;

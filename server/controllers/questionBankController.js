@@ -246,7 +246,8 @@ exports.generateExamFromBank = async (req, res) => {
                     type: 'subjective',
                     model_answer: '',
                     key_points: [],
-                    image_url: ''
+                    image_url: '',
+                    max_marks: row.max_marks ? Number(row.max_marks) : 10
                 });
             }
         }
@@ -264,12 +265,34 @@ exports.generateExamFromBank = async (req, res) => {
         );
         const examId = examResult.rows[0].id;
 
-        // Auto-generate classroom code
-        const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-        await query(
-            'INSERT INTO classrooms (code, exam_id, teacher_id) VALUES ($1, $2, $3)',
-            [code, examId, teacherId]
-        );
+        // Auto-generate unique classroom code
+        let code = '';
+        let codeCreated = false;
+        let attempts = 0;
+        const MAX_ATTEMPTS = 5;
+
+        while (!codeCreated && attempts < MAX_ATTEMPTS) {
+            code = Math.random().toString(36).substring(2, 8).toUpperCase();
+            try {
+                await query(
+                    'INSERT INTO classrooms (code, exam_id, teacher_id) VALUES ($1, $2, $3)',
+                    [code, examId, teacherId]
+                );
+                codeCreated = true;
+            } catch (err) {
+                // If the error code relates to unique constraint on 'code', retry
+                // PostgreSQL unique violation is '23505'
+                if (err.code === '23505') {
+                    attempts++;
+                } else {
+                    throw err; // Re-throw other unexpected DB errors
+                }
+            }
+        }
+
+        if (!codeCreated) {
+            throw new Error('Failed to generate a unique classroom code after multiple attempts. Please try again.');
+        }
 
         res.status(201).json({
             message: 'Exam generated successfully from question bank!',
