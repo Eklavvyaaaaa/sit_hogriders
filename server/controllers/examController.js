@@ -145,6 +145,7 @@ exports.submitExam = async (req, res) => {
 
         // 2. ATI scoring for subjective (outside transaction to avoid hanging)
         let totalATI = 0;
+        let totalContent = 0;
         let subjectiveCount = 0;
         const atiEvaluations = [];
 
@@ -162,15 +163,25 @@ exports.submitExam = async (req, res) => {
 
             atiEvaluations.push({ questionIndex: i, answerText, q });
 
-            if (q.type === 'subjective' && answerText.trim()) {
+            if (q.type === 'subjective') {
+                subjectiveCount++;
                 const modelAnswer = q.model_answer || '';
                 const keyPoints = q.key_points || [];
 
                 let atiResult;
-                try {
-                    atiResult = await evaluateATI(answerText, modelAnswer, keyPoints);
-                } catch (err) {
-                    console.error(`ATI engine call failed:`, err.message);
+                if (answerText.trim()) {
+                    try {
+                        atiResult = await evaluateATI(answerText, modelAnswer, keyPoints);
+                    } catch (err) {
+                        console.error(`ATI engine call failed:`, err.message);
+                        atiResult = {
+                            content_score: 0,
+                            pattern_score: 0,
+                            ati_score: 0,
+                            trust_level: 'Low Trust'
+                        };
+                    }
+                } else {
                     atiResult = {
                         content_score: 0,
                         pattern_score: 0,
@@ -181,7 +192,7 @@ exports.submitExam = async (req, res) => {
 
                 atiEvaluations[i].atiResult = atiResult;
                 totalATI += atiResult.ati_score;
-                subjectiveCount++;
+                totalContent += atiResult.content_score;
             }
         }
 
@@ -192,16 +203,19 @@ exports.submitExam = async (req, res) => {
 
         if (subjectiveCount > 0) {
             const avgATI = totalATI / subjectiveCount;
+            const avgContent = totalContent / subjectiveCount;
+
+            // Trust factor is informational only (based on ATI), never applied to grade
             trustFactor = avgATI >= 80 ? 1.0 : avgATI >= 55 ? 0.85 : 0.6;
 
-            // Blend MCQ + ATI scores
+            // Blend MCQ + Content scores (ATI does NOT affect academic grade)
             const mcqPercent = mcqCount > 0 ? (mcqScore / mcqCount) * 100 : 0;
             const totalQuestions = mcqCount + subjectiveCount;
             const mcqWeight = mcqCount / totalQuestions;
             const subjectiveWeight = subjectiveCount / totalQuestions;
 
-            baseScore = (mcqPercent * mcqWeight + avgATI * subjectiveWeight);
-            finalScore = baseScore * trustFactor;
+            baseScore = (mcqPercent * mcqWeight + avgContent * subjectiveWeight);
+            finalScore = baseScore;  // No trust factor reduction
         } else {
             // Pure MCQ exam
             baseScore = mcqCount > 0 ? (mcqScore / mcqCount) * 100 : 0;

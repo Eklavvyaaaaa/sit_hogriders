@@ -236,16 +236,29 @@ const CreateExam = () => {
                                     </div>
 
                                     {q.type === 'mcq' ? (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                            {q.options.map((opt, oIndex) => (
-                                                <div key={oIndex} className="flex items-center space-x-2.5">
-                                                    <input type="radio" name={`correct-${qIndex}`} checked={q.correctOption === oIndex}
-                                                        onChange={() => updateQuestion(qIndex, 'correctOption', oIndex)}
-                                                        className="w-4 h-4" style={{ accentColor: 'var(--accent-color)' }} />
-                                                    <input type="text" className="input-field" placeholder={`Option ${oIndex + 1}`}
-                                                        value={opt} onChange={e => updateQuestionOption(qIndex, oIndex, e.target.value)} />
-                                                </div>
-                                            ))}
+                                        <div className="space-y-3">
+                                            <label className="block text-[10px] text-slate-400 font-black mb-2 uppercase tracking-widest">Options (Select the correct answer)</label>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                {q.options.map((opt, oIndex) => (
+                                                    <div key={oIndex} className={`flex items-center space-x-2.5 p-2 rounded-lg border-2 transition-all ${q.correctOption === oIndex ? 'border-blue-500 bg-blue-50/50' : 'border-transparent'}`}>
+                                                        <input
+                                                            type="radio"
+                                                            name={`correct-${qIndex}`}
+                                                            checked={q.correctOption === oIndex}
+                                                            onChange={() => updateQuestion(qIndex, 'correctOption', oIndex)}
+                                                            className="w-5 h-5 text-blue-600 bg-white border-slate-300 focus:ring-blue-500 cursor-pointer"
+                                                            title={`Mark Option ${oIndex + 1} as Correct`}
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            className={`flex-1 p-2.5 bg-slate-50 border-2 rounded-lg focus:border-blue-600 focus:bg-white focus:ring-0 transition-all text-sm font-medium placeholder-slate-400 ${q.correctOption === oIndex ? 'border-blue-200 text-blue-900' : 'border-slate-100 text-slate-900'}`}
+                                                            placeholder={`Option ${oIndex + 1}`}
+                                                            value={opt}
+                                                            onChange={e => updateQuestionOption(qIndex, oIndex, e.target.value)}
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
                                     ) : (
                                         <div className="space-y-4">

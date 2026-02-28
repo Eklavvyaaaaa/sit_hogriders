@@ -138,13 +138,16 @@ function calculatePCS(studentAnswer, modelAnswer) {
     return Math.round(baseScore * 10000) / 100; // Return as 0-100 score
 }
 
-// ─── Main ATI Evaluator ─────────────────────────────────────────────────────────
+// ─── Main ATI Evaluator (Non-Compensatory Model) ────────────────────────────────
 /**
  * Evaluate ATI locally. Falls back to the external engine if ATI_ENGINE_URL is set
  * and reachable, otherwise uses the built-in Node.js implementation.
  *
- * ATI formula (same as Python):
- *   ATI = 0.5 * content_score + 0.3 * visual_score + 0.2 * pattern_score
+ * Non-compensatory architecture:
+ *   1. Base = Content Score (academic quality is the anchor)
+ *   2. Integrity Multiplier = visual_score / 100 (can only REDUCE, never inflate)
+ *   3. Pattern Gate = caps score for anomalous writing patterns
+ *   4. Weak Answer Protection = hard cap if content < 50
  */
 async function evaluateATI(studentAnswer, modelAnswer, keyPoints = [], visualScore = 100) {
     // Try external engine only if URL is configured
@@ -176,13 +179,35 @@ async function evaluateATI(studentAnswer, modelAnswer, keyPoints = [], visualSco
         }
     }
 
-    // ── Local evaluation (Node.js implementation) ──
+    // ── Local evaluation (Node.js non-compensatory implementation) ──
     const contentScore = calculateCIS(studentAnswer, modelAnswer, keyPoints);
     const patternScore = calculatePCS(studentAnswer, modelAnswer);
 
-    const atiScore = Math.round(
-        (0.5 * contentScore + 0.3 * visualScore + 0.2 * patternScore) * 100
-    ) / 100;
+    // 1. Base = Content Score
+    let atiScore = contentScore;
+
+    // 2. Integrity Multiplier (visual / 100, clamped 0.0–1.0)
+    const integrityMultiplier = Math.max(0.0, Math.min(visualScore / 100.0, 1.0));
+    atiScore = atiScore * integrityMultiplier;
+
+    // 3. Pattern Gate — caps score for anomalous writing patterns
+    let patternGateApplied = false;
+    if (patternScore < 30) {
+        atiScore = Math.min(atiScore, 20);
+        patternGateApplied = true;
+    } else if (patternScore < 50) {
+        atiScore = Math.min(atiScore, 40);
+        patternGateApplied = true;
+    }
+
+    // 4. Weak Answer Protection — if content is poor, cap ATI hard
+    let weakAnswerCapApplied = false;
+    if (contentScore < 50) {
+        atiScore = Math.min(atiScore, 30);
+        weakAnswerCapApplied = true;
+    }
+
+    atiScore = Math.round(atiScore * 100) / 100;
 
     let trustLevel;
     if (atiScore >= 80) trustLevel = 'Highly Trustworthy';
@@ -194,6 +219,9 @@ async function evaluateATI(studentAnswer, modelAnswer, keyPoints = [], visualSco
         content_score: contentScore,
         pattern_score: patternScore,
         visual_score: visualScore,
+        integrity_multiplier: integrityMultiplier,
+        pattern_gate_applied: patternGateApplied,
+        weak_answer_cap_applied: weakAnswerCapApplied,
         trust_level: trustLevel
     };
 }

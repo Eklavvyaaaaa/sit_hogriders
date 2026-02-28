@@ -7,6 +7,8 @@ import api from '../services/api';
 import { AuthContext } from '../context/AuthContext';
 import { CheckCircle2, ShieldCheck, PlayCircle, ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import ChatBox from '../components/ChatBox';
+
+import { useWebRTC } from '../context/WebRTCContext';
 import { useToast } from '../hooks/useToast';
 import ToastOverlay from '../components/ToastOverlay';
 
@@ -14,6 +16,8 @@ const ExamPage = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const { user } = useContext(AuthContext);
+    const { registerLocalStream, unregisterLocalStream } = useWebRTC();
+
     const examData = location.state?.examData;
     const classroomCode = location.state?.classroomCode;
 
@@ -38,15 +42,23 @@ const ExamPage = () => {
             return;
         }
 
-        navigator.mediaDevices.getUserMedia({ video: true })
-            .then(stream => { streamRef.current = stream; })
-            .catch(err => { console.error("Camera pre-fetch failed:", err); });
+        // Camera pre-fetch and register to global WebRTC Context
+        navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+            .then(stream => {
+                streamRef.current = stream;
+                registerLocalStream(stream);
+            })
+            .catch(err => {
+                console.error("Camera pre-fetch failed:", err);
+            });
+
         return () => {
             if (removeFocusListenerRef.current) removeFocusListenerRef.current();
             if (window.electronAPI) window.electronAPI.deactivateLock();
-            if (streamRef.current) streamRef.current.getTracks().forEach(t => { t.stop(); });
+
+            unregisterLocalStream();
         };
-    }, [examData, navigate]);
+    }, [examData, navigate, registerLocalStream, unregisterLocalStream]);
 
     const handleStartExam = () => {
         ignoreNextBlur.current = true;
