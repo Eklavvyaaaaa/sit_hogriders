@@ -47,6 +47,13 @@ const ExamResults = () => {
         return 'bg-red-50 border-red-200';
     };
 
+    const getTrustBand = (trustFactor) => {
+        if (trustFactor == null) return { label: '—', style: 'bg-slate-50 text-slate-500 border-slate-200' };
+        if (trustFactor >= 0.85) return { label: 'High', style: 'bg-emerald-50 text-emerald-600 border-emerald-200' };
+        if (trustFactor >= 0.6) return { label: 'Medium', style: 'bg-amber-50 text-amber-600 border-amber-200' };
+        return { label: 'Low', style: 'bg-red-50 text-red-600 border-red-200' };
+    };
+
     const avgScore = results.length > 0
         ? results.reduce((acc, r) => acc + (r.final_score || 0), 0) / results.length
         : 0;
@@ -104,6 +111,7 @@ const ExamResults = () => {
                                 <th className="p-4">MCQ</th>
                                 <th className="p-4">Base Score</th>
                                 <th className="p-4">Trust</th>
+                                <th className="p-4">Trust Band</th>
                                 <th className="p-4">Final Score</th>
                                 <th className="p-4">Violations</th>
                                 <th className="p-4">Status</th>
@@ -136,6 +144,16 @@ const ExamResults = () => {
                                         </span>
                                     </td>
                                     <td className="p-4 text-slate-600 text-sm font-medium">{r.trust_factor != null ? `${r.trust_factor}x` : '-'}</td>
+                                    <td className="p-4">
+                                        {(() => {
+                                            const band = getTrustBand(r.trust_factor);
+                                            return (
+                                                <span className={`text-[10px] px-2 py-1 rounded-md border font-black uppercase tracking-widest ${band.style}`}>
+                                                    {band.label}
+                                                </span>
+                                            );
+                                        })()}
+                                    </td>
                                     <td className="p-4">
                                         <span className={`inline-flex items-center justify-center min-w-[40px] px-2 py-1 rounded-md border font-black text-sm ${getScoreBg(r.final_score)} ${getScoreColor(r.final_score)}`}>
                                             {r.final_score != null ? Math.round(r.final_score) : '-'}

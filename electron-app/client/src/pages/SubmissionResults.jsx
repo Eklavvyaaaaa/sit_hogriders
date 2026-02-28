@@ -89,7 +89,7 @@ const SubmissionResults = () => {
 
                 {/* Score Overview Cards */}
                 {finalGrade && (
-                    <div className="grid grid-cols-3 gap-4 mb-6">
+                    <div className="grid grid-cols-4 gap-4 mb-6">
                         <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] text-center">
                             <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center mx-auto mb-2">
                                 <Award size={20} className="text-blue-600" />
@@ -110,6 +110,31 @@ const SubmissionResults = () => {
                             </div>
                             <p className={`text-2xl font-black ${getScoreColor(finalGrade.final_score)}`}>{Math.round(finalGrade.final_score)}</p>
                             <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black">Final Score</p>
+                        </div>
+                        <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] text-center">
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center mx-auto mb-2 ${finalGrade.trust_factor == null ? 'bg-slate-50'
+                                    : finalGrade.trust_factor >= 0.85 ? 'bg-emerald-50'
+                                        : finalGrade.trust_factor >= 0.6 ? 'bg-amber-50'
+                                            : 'bg-red-50'
+                                }`}>
+                                <Shield size={20} className={
+                                    finalGrade.trust_factor == null ? 'text-slate-400'
+                                        : finalGrade.trust_factor >= 0.85 ? 'text-emerald-600'
+                                            : finalGrade.trust_factor >= 0.6 ? 'text-amber-600'
+                                                : 'text-red-600'
+                                } />
+                            </div>
+                            <p className={`text-2xl font-black ${finalGrade.trust_factor == null ? 'text-slate-400'
+                                    : finalGrade.trust_factor >= 0.85 ? 'text-emerald-600'
+                                        : finalGrade.trust_factor >= 0.6 ? 'text-amber-600'
+                                            : 'text-red-600'
+                                }`}>
+                                {finalGrade.trust_factor == null ? 'N/A'
+                                    : finalGrade.trust_factor >= 0.85 ? 'High'
+                                        : finalGrade.trust_factor >= 0.6 ? 'Medium'
+                                            : 'Low'}
+                            </p>
+                            <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black">Trust Band</p>
                         </div>
                     </div>
                 )}
