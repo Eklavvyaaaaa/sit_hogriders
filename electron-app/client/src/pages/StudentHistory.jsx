@@ -252,10 +252,12 @@ const StudentHistory = () => {
                                                     </span>
                                                 </td>
                                                 <td className="p-4">
-                                                    {item.final_score != null && (
+                                                    {item.final_score != null ? (
                                                         <span className={`inline-flex items-center justify-center min-w-[44px] px-2.5 py-1.5 rounded-lg border font-black text-base ${scoreBadge.bg} ${scoreBadge.border} ${scoreBadge.text}`}>
                                                             {Math.round(item.final_score)}
                                                         </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center justify-center min-w-[44px] px-2.5 py-1.5 rounded-lg border font-black text-base bg-slate-50 border-slate-200 text-slate-400">—</span>
                                                     )}
                                                 </td>
                                                 <td className="p-4">
