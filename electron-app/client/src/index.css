@@ -49,6 +49,7 @@
   --modal-overlay: rgba(0, 0, 0, 0.4);
   --toast-bg: #1E2A38;
   --toast-text: #FFFFFF;
+
   color-scheme: light;
 }
 
@@ -86,6 +87,7 @@
   --modal-overlay: rgba(0, 0, 0, 0.6);
   --toast-bg: #E5E7EB;
   --toast-text: #1E2A38;
+
   color-scheme: dark;
 }
 

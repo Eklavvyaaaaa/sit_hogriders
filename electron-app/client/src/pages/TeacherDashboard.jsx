@@ -1,22 +1,11 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import api from '../services/api';
-import { PlusCircle, Eye, Activity, BarChart3, Users, AlertTriangle, Flag, Download, Trophy, CheckCircle2, Loader2, Clock, XCircle, CalendarClock, Copy, MessageSquare, Trash2, MoreVertical, StopCircle, TimerReset, UserCheck, X } from 'lucide-react';
+import { PlusCircle, Eye, Activity, BarChart3, Users, AlertTriangle, Flag, Download, Trophy, CheckCircle2, Loader2, Clock, XCircle, CalendarClock, Copy, MessageSquare, Trash2, MoreVertical, StopCircle, TimerReset, UserCheck } from 'lucide-react';
 import ChatBox from '../components/ChatBox';
-
-/* ===== Toast Hook ===== */
-let toastId = 0;
-const useToast = () => {
-    const [toasts, setToasts] = useState([]);
-    const addToast = useCallback((message, type = 'info') => {
-        const id = ++toastId;
-        setToasts(prev => [...prev, { id, message, type }]);
-        setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
-    }, []);
-    const removeToast = useCallback((id) => setToasts(prev => prev.filter(t => t.id !== id)), []);
-    return { toasts, addToast, removeToast };
-};
+import { useToast } from '../hooks/useToast';
+import ToastOverlay from '../components/ToastOverlay';
 
 /* ===== Confirm Modal ===== */
 const ConfirmModal = ({ title, message, onConfirm, onCancel, danger }) => (
@@ -232,15 +221,7 @@ const TeacherDashboard = () => {
         <div style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }} className="min-h-screen flex flex-col font-inter transition-colors duration-200">
             <Navbar />
 
-            {/* Toast Notifications */}
-            <div className="toast-container">
-                {toasts.map(t => (
-                    <div key={t.id} className={`toast toast-${t.type} flex items-center justify-between`}>
-                        <span>{t.message}</span>
-                        <button onClick={() => removeToast(t.id)} className="ml-3 opacity-70 hover:opacity-100"><X size={14} /></button>
-                    </div>
-                ))}
-            </div>
+            <ToastOverlay toasts={toasts} removeToast={removeToast} />
 
             <div className="flex-1 max-w-7xl w-full mx-auto px-6 py-8 lg:px-8">
                 {/* Header */}
@@ -303,7 +284,7 @@ const TeacherDashboard = () => {
                         {/* Filter Tabs */}
                         <div className="flex items-center justify-between mb-6">
                             <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="flex space-x-0.5 rounded-lg p-1 border">
-                                {['all', 'active', 'scheduled', 'completed', 'terminated'].map(f => (
+                                {['all', 'active', 'scheduled', 'completed', 'terminated', 'stopped'].map(f => (
                                     <button
                                         key={f}
                                         onClick={() => setFilter(f)}

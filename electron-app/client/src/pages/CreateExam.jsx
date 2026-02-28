@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import api from '../services/api';
@@ -13,11 +13,13 @@ const CreateExam = () => {
     ]);
     const [classroomCode, setClassroomCode] = useState(null);
     const [toast, setToast] = useState(null);
+    const toastTimerRef = useRef(null);
     const navigate = useNavigate();
 
     const showToast = (message, type = 'error') => {
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
         setToast({ message, type });
-        setTimeout(() => setToast(null), 3500);
+        toastTimerRef.current = setTimeout(() => { setToast(null); toastTimerRef.current = null; }, 3500);
     };
 
     const addQuestion = (type = 'mcq') => {

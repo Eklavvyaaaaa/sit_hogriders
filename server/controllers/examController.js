@@ -560,8 +560,8 @@ exports.extendExam = async (req, res) => {
         const { extra_minutes } = req.body;
         const teacherId = req.user.id;
 
-        if (!extra_minutes || typeof extra_minutes !== 'number' || extra_minutes <= 0) {
-            return res.status(400).json({ message: 'extra_minutes must be a positive number' });
+        if (!Number.isFinite(extra_minutes) || !Number.isInteger(extra_minutes) || extra_minutes <= 0) {
+            return res.status(400).json({ message: 'extra_minutes must be a positive integer' });
         }
 
         const result = await query(
@@ -592,9 +592,14 @@ exports.grantReattempt = async (req, res) => {
             return res.status(404).json({ message: 'Exam not found or unauthorized' });
         }
 
-        // Update the student's submission status to "reopened"
+        // Update only the latest submitted attempt for this student
         const result = await query(
-            "UPDATE submissions SET status = 'reopened' WHERE exam_id = $1 AND student_id = $2 RETURNING *",
+            `UPDATE submissions SET status = 'reopened'
+             WHERE id = (
+                 SELECT id FROM submissions
+                 WHERE exam_id = $1 AND student_id = $2 AND status = 'submitted'
+                 ORDER BY created_at DESC LIMIT 1
+             ) RETURNING *`,
             [examId, studentId]
         );
 

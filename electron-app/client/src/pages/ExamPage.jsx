@@ -1,25 +1,14 @@
-import React, { useState, useEffect, useContext, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Timer from '../components/Timer';
 import QuestionCard from '../components/QuestionCard';
 import MonitoringCamera from '../components/MonitoringCamera';
 import api from '../services/api';
 import { AuthContext } from '../context/AuthContext';
-import { CheckCircle2, ShieldCheck, PlayCircle, LogIn, ChevronLeft, ChevronRight, Info, UserCheck, X } from 'lucide-react';
+import { CheckCircle2, ShieldCheck, PlayCircle, ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import ChatBox from '../components/ChatBox';
-
-/* Inline toast hook */
-let _tid = 0;
-const useToast = () => {
-    const [toasts, setToasts] = useState([]);
-    const addToast = useCallback((msg, type = 'info') => {
-        const id = ++_tid;
-        setToasts(p => [...p, { id, msg, type }]);
-        setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 3500);
-    }, []);
-    const removeToast = useCallback(id => setToasts(p => p.filter(t => t.id !== id)), []);
-    return { toasts, addToast, removeToast };
-};
+import { useToast } from '../hooks/useToast';
+import ToastOverlay from '../components/ToastOverlay';
 
 const ExamPage = () => {
     const location = useLocation();
@@ -55,7 +44,7 @@ const ExamPage = () => {
         return () => {
             if (removeFocusListenerRef.current) removeFocusListenerRef.current();
             if (window.electronAPI) window.electronAPI.deactivateLock();
-            if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+            if (streamRef.current) streamRef.current.getTracks().forEach(t => { t.stop(); });
         };
     }, [examData, navigate]);
 
@@ -129,7 +118,7 @@ const ExamPage = () => {
             });
             await api.post('/exam/submit', { examId: examData.examId, answers: combinedAnswers, score });
             setIsSubmitted(true);
-            if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
+            if (streamRef.current) { streamRef.current.getTracks().forEach(t => { t.stop(); }); streamRef.current = null; }
             if (window.electronAPI) window.electronAPI.deactivateLock();
             if (removeFocusListenerRef.current) removeFocusListenerRef.current();
         } catch (err) {
@@ -138,44 +127,14 @@ const ExamPage = () => {
         }
     };
 
-    const [showGrantModal, setShowGrantModal] = useState(false);
-    const [grantStudentId, setGrantStudentId] = useState('');
 
-    const handleGrantReattempt = async () => {
-        const id = Number(grantStudentId);
-        if (isNaN(id) || id <= 0) {
-            addToast('Please enter a valid Student ID.', 'error');
-            return;
-        }
-        try {
-            await api.patch(`/exam/${examData.examId}/grant/${id}`);
-            addToast('Reattempt granted successfully.', 'success');
-            setShowGrantModal(false);
-            setGrantStudentId('');
-        } catch (err) {
-            console.error('Failed to grant reattempt', err);
-            addToast(err.response?.data?.message || 'Failed to grant reattempt.', 'error');
-        }
-    };
 
     if (!examData) return null;
-
-    /* Toast overlay used on all screens */
-    const ToastOverlay = () => (
-        <div className="toast-container">
-            {toasts.map(t => (
-                <div key={t.id} className={`toast toast-${t.type} flex items-center justify-between`}>
-                    <span>{t.msg}</span>
-                    <button onClick={() => removeToast(t.id)} className="ml-3 opacity-70 hover:opacity-100"><X size={14} /></button>
-                </div>
-            ))}
-        </div>
-    );
 
     if (isSubmitted) {
         return (
             <div style={{ backgroundColor: 'var(--bg-primary)' }} className="min-h-screen flex items-center justify-center p-4 font-inter">
-                <ToastOverlay />
+                <ToastOverlay toasts={toasts} removeToast={removeToast} />
                 <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="p-12 rounded-xl text-center shadow-sm border max-w-lg w-full">
                     <div style={{ backgroundColor: 'var(--success-light)' }} className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-8">
                         <CheckCircle2 size={40} style={{ color: 'var(--success-color)' }} />
@@ -193,7 +152,7 @@ const ExamPage = () => {
     if (!hasStarted) {
         return (
             <div style={{ backgroundColor: 'var(--bg-primary)' }} className="min-h-screen flex items-center justify-center p-4 font-inter">
-                <ToastOverlay />
+                <ToastOverlay toasts={toasts} removeToast={removeToast} />
                 <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="p-12 rounded-xl text-center shadow-sm border max-w-lg w-full">
                     <div style={{ backgroundColor: 'var(--accent-color)' }} className="p-4 rounded-xl text-white w-fit mx-auto mb-8 shadow-sm">
                         <ShieldCheck size={36} />
@@ -224,7 +183,7 @@ const ExamPage = () => {
 
     return (
         <div style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }} className="flex flex-col h-screen font-inter">
-            <ToastOverlay />
+            <ToastOverlay toasts={toasts} removeToast={removeToast} />
 
             {/* Top Bar */}
             <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="px-8 py-4 flex justify-between items-center shadow-sm border-b shrink-0">
@@ -240,11 +199,6 @@ const ExamPage = () => {
                         <span style={{ color: 'var(--accent-color)' }} className="text-xs font-semibold uppercase tracking-widest mr-2">Answered</span>
                         <span style={{ color: 'var(--accent-color)' }} className="font-bold">{getAnsweredCount()} / {examData.questions.length}</span>
                     </div>
-                    {user?.role === 'teacher' && (
-                        <button onClick={() => setShowGrantModal(true)} className="btn btn-sm btn-secondary">
-                            <UserCheck size={14} /><span>Grant Reattempt</span>
-                        </button>
-                    )}
                 </div>
             </div>
 
