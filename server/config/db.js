@@ -128,6 +128,13 @@ const initDB = async () => {
       "ALTER TABLE students_exam ADD COLUMN IF NOT EXISTS terminated BOOLEAN DEFAULT false",
       "ALTER TABLE students_exam ADD COLUMN IF NOT EXISTS terminated_at TIMESTAMP",
       "ALTER TABLE students_exam ADD COLUMN IF NOT EXISTS last_chance_used BOOLEAN DEFAULT false",
+      // Migrate all TIMESTAMP columns to TIMESTAMPTZ for timezone consistency (only if not already TIMESTAMPTZ)
+      "DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='exams' AND column_name='end_time' AND udt_name='timestamp') THEN ALTER TABLE exams ALTER COLUMN end_time TYPE TIMESTAMPTZ USING end_time AT TIME ZONE 'UTC'; END IF; END $$",
+      "DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='exams' AND column_name='created_at' AND udt_name='timestamp') THEN ALTER TABLE exams ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC'; END IF; END $$",
+      "DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='submissions' AND column_name='submitted_at' AND udt_name='timestamp') THEN ALTER TABLE submissions ALTER COLUMN submitted_at TYPE TIMESTAMPTZ USING submitted_at AT TIME ZONE 'UTC'; END IF; END $$",
+      "DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='monitoring_logs' AND column_name='timestamp' AND udt_name='timestamp') THEN ALTER TABLE monitoring_logs ALTER COLUMN timestamp TYPE TIMESTAMPTZ USING timestamp AT TIME ZONE 'UTC'; END IF; END $$",
+      "DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='students_exam' AND column_name='joined_at' AND udt_name='timestamp') THEN ALTER TABLE students_exam ALTER COLUMN joined_at TYPE TIMESTAMPTZ USING joined_at AT TIME ZONE 'UTC'; END IF; END $$",
+      "DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chat_messages' AND column_name='created_at' AND udt_name='timestamp') THEN ALTER TABLE chat_messages ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC'; END IF; END $$",
       // Rename legacy 'message' column to 'message_text' if it exists
       "DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chat_messages' AND column_name='message') THEN ALTER TABLE chat_messages RENAME COLUMN message TO message_text; END IF; END $$",
       // Unique constraint for submissions to prevent duplicate submission race conditions

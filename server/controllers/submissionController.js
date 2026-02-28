@@ -32,14 +32,14 @@ async function finalizeSubmission(submissionId, userId) {
       return { statusCode: 400, body: { message: 'Submission already finalized' } };
     }
 
-    // Time-based guard: if submission_time >= end_time, mark as auto-submitted
+    // Time-based guard: use DB time to check if exam has expired
     let isAutoSubmitted = false;
-    const examResult = await client.query('SELECT end_time FROM exams WHERE id = $1', [submission.exam_id]);
+    const examResult = await client.query(
+      'SELECT end_time, NOW() >= end_time AS is_expired FROM exams WHERE id = $1',
+      [submission.exam_id]
+    );
     if (examResult.rows.length > 0 && examResult.rows[0].end_time) {
-      const endTime = new Date(examResult.rows[0].end_time);
-      if (new Date() >= endTime) {
-        isAutoSubmitted = true;
-      }
+      isAutoSubmitted = examResult.rows[0].is_expired;
     }
 
     // Use explicit WHERE status = 'in_progress' to prevent concurrent double-submits
@@ -109,16 +109,16 @@ exports.submitAnswer = async (req, res) => {
       return res.status(400).json({ message: 'Submission already finalized' });
     }
 
-    // Time-based guard: reject answers after exam end_time
-    const examResult = await client.query('SELECT end_time FROM exams WHERE id = $1', [submission.exam_id]);
-    if (examResult.rows.length > 0 && examResult.rows[0].end_time) {
-      const endTime = new Date(examResult.rows[0].end_time);
-      if (new Date() >= endTime) {
-        await client.query('ROLLBACK');
-        // Auto-submit this student's submission since time is up
-        await autoForceSubmit(submission_id, submission.exam_id);
-        return res.status(403).json({ message: 'Exam time has expired. Your answers have been auto-submitted.' });
-      }
+    // Time-based guard: reject answers after exam end_time (using DB time)
+    const examResult = await client.query(
+      'SELECT end_time, NOW() >= end_time AS is_expired FROM exams WHERE id = $1',
+      [submission.exam_id]
+    );
+    if (examResult.rows.length > 0 && examResult.rows[0].end_time && examResult.rows[0].is_expired) {
+      await client.query('ROLLBACK');
+      // Auto-submit this student's submission since time is up
+      await autoForceSubmit(submission_id, submission.exam_id);
+      return res.status(403).json({ message: 'Exam time has expired. Your answers have been auto-submitted.' });
     }
 
     const result = await client.query(
@@ -192,13 +192,19 @@ exports.getSubmissionStatus = async (req, res) => {
 
     const submission = subResult.rows.length > 0 ? subResult.rows[0] : null;
 
-    // Calculate remaining time
+    // Calculate remaining time using DB clock
     let remainingSeconds = null;
     let isExpired = false;
     if (exam.end_time) {
-      const msRemaining = new Date(exam.end_time).getTime() - Date.now();
-      remainingSeconds = Math.max(0, Math.floor(msRemaining / 1000));
-      isExpired = msRemaining <= 0;
+      const timeResult = await query(
+        'SELECT EXTRACT(EPOCH FROM (end_time - NOW())) AS remaining_seconds FROM exams WHERE id = $1',
+        [examId]
+      );
+      if (timeResult.rows.length > 0) {
+        const dbRemaining = parseFloat(timeResult.rows[0].remaining_seconds);
+        remainingSeconds = Math.max(0, Math.floor(dbRemaining));
+        isExpired = dbRemaining <= 0;
+      }
     }
 
     res.json({
@@ -289,7 +295,6 @@ async function calculateScores(client, submission_id, exam_id) {
     throw new Error('Failed to parse exam questions JSON');
   }
 
-
   const answersResult = await client.query(
     'SELECT * FROM answers WHERE submission_id = $1',
     [submission_id]
@@ -300,6 +305,7 @@ async function calculateScores(client, submission_id, exam_id) {
 
   for (const ans of answersResult.rows) {
     const question = questions.find(q => q.id === ans.question_id || q.question_id === ans.question_id);
+
     const modelAnswer = question?.model_answer || question?.answer || '';
     const keyPoints = question?.key_points || [];
 
@@ -310,7 +316,6 @@ async function calculateScores(client, submission_id, exam_id) {
         atiResult = await evaluateATI(ans.answer_text, modelAnswer, keyPoints);
       } catch (err) {
         console.error(`ATI engine call failed for answer ${ans.id}:`, err.message);
-
         atiResult = {
           content_score: 0,
           pattern_score: 0,
@@ -319,7 +324,6 @@ async function calculateScores(client, submission_id, exam_id) {
         };
       }
     } else {
-
       atiResult = {
         content_score: 0,
         pattern_score: 0,
@@ -328,20 +332,17 @@ async function calculateScores(client, submission_id, exam_id) {
       };
     }
 
-
     await client.query(
       `INSERT INTO nlp_evaluations (answer_id, semantic_score, reasoning_score)
        VALUES ($1, $2, $3) ON CONFLICT (answer_id) DO UPDATE SET semantic_score = $2, reasoning_score = $3`,
       [ans.id, atiResult.content_score / 100, atiResult.pattern_score / 100]
     );
 
-
     await client.query(
       `INSERT INTO pac_scores (answer_id, similarity_score)
        VALUES ($1, $2) ON CONFLICT (answer_id) DO UPDATE SET similarity_score = $2`,
       [ans.id, atiResult.pattern_score / 100]
     );
-
 
     await client.query(
       `INSERT INTO ati_scores (answer_id, ati_value)
@@ -352,7 +353,6 @@ async function calculateScores(client, submission_id, exam_id) {
     totalATI += atiResult.ati_score;
     answerCount++;
   }
-
 
   const avgATI = answerCount > 0 ? totalATI / answerCount : 0;
   const trustFactor = avgATI >= 80 ? 1.0 : avgATI >= 55 ? 0.85 : 0.6;

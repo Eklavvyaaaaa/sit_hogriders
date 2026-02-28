@@ -118,6 +118,7 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
                 }
             }
         };
+
         loadModel();
 
         // ── Hook Cleanup (Do NOT destroy the global model here) ──
@@ -175,6 +176,7 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
         if (now - lastLogTime.current < 5000) return;
 
         lastLogTime.current = now;
+
         const newAlert = { time: new Date(), type: eventType, confidence };
         const updatedAlerts = [...alertsRef.current, newAlert];
 
@@ -428,7 +430,6 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
             setMonitoringError('Camera access denied or unavailable. Monitoring disabled.');
         }
     }, [sendLog]);
-
 
     return {
         startMonitoring,

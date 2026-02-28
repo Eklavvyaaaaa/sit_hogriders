@@ -33,6 +33,7 @@ const JoinClassroom = () => {
         };
         fetchHistory();
     }, []);
+
     const handleInput = (e, index) => {
         const value = e.target.value.toUpperCase();
         if (value.length > 1) return;
@@ -74,11 +75,6 @@ const JoinClassroom = () => {
             setLoading(false);
         }
     };
-
-    const upcomingExams = [
-        { id: 1, subject: 'Computer Science', title: 'Data Structures Midterm', date: 'Feb 28, 2026', duration: '60 min' },
-        { id: 2, subject: 'Mathematics', title: 'Calculus Final', date: 'Mar 02, 2026', duration: '90 min' }
-    ];
 
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
@@ -229,6 +225,7 @@ const JoinClassroom = () => {
                             )}
                         </div>
                     </div>
+
                     <p className="text-slate-300 text-sm font-bold tracking-widest uppercase">Smart Assessment Technology</p>
                 </div>
 
@@ -296,28 +293,6 @@ const JoinClassroom = () => {
                                         )}
                                     </button>
                                 </form>
-                            </div>
-                        </div>
-
-                        {/* Upcoming exams in the right panel (mobile visible) */}
-                        <div className="space-y-4">
-                            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider pl-1">Upcoming Exams</h3>
-                            <div className="grid gap-4">
-                                {upcomingExams.map(exam => (
-                                    <div key={exam.id} className="bg-white p-5 rounded-xl border border-white/50 shadow-sm flex items-center justify-between group hover:border-blue-200 transition-all cursor-pointer">
-                                        <div>
-                                            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-0.5">{exam.subject}</p>
-                                            <p className="text-slate-800 font-bold text-sm tracking-tight">{exam.title}</p>
-                                            <div className="flex items-center space-x-4 mt-1 text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
-                                                <span className="flex items-center gap-1"><Calendar size={10} /> {exam.date}</span>
-                                                <span className="flex items-center gap-1"><Clock size={10} /> {exam.duration}</span>
-                                            </div>
-                                        </div>
-                                        <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-blue-600 group-hover:text-white transition-all">
-                                            <ChevronRight size={16} />
-                                        </div>
-                                    </div>
-                                ))}
                             </div>
                         </div>
 

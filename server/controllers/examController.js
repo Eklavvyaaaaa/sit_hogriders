@@ -305,16 +305,14 @@ exports.getExamStats = async (req, res) => {
 
         const studentsList = await query(`
             SELECT 
-                s.student_id, 
-                (SELECT COUNT(*) FROM monitoring_logs m WHERE m.exam_id = $1 AND m.user_id = s.student_id) as violation_count, 
-                MAX(COALESCE(se.flagged, false)::int) > 0 as flagged, 
+                se.student_id, 
+                (SELECT COUNT(*) FROM monitoring_logs m WHERE m.exam_id = $1 AND m.user_id = se.student_id) as violation_count, 
+                COALESCE(se.flagged, false) as flagged, 
                 u.name, 
                 u.email
-            FROM submissions s
-            JOIN users u ON s.student_id = u.id
-            LEFT JOIN students_exam se ON s.student_id = se.student_id AND s.exam_id = se.exam_id
-            WHERE s.exam_id = $1 AND s.status = 'in_progress'
-            GROUP BY s.student_id, u.name, u.email
+            FROM students_exam se
+            JOIN users u ON se.student_id = u.id
+            WHERE se.exam_id = $1
             ORDER BY u.name ASC
         `, [id]);
 
@@ -400,6 +398,7 @@ exports.exportExamLogs = async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 };
+
 // Update exam duration (teacher only)
 exports.updateExamTime = async (req, res) => {
     try {
@@ -482,5 +481,58 @@ exports.rescheduleExam = async (req, res) => {
     } catch (error) {
         console.error('Reschedule exam error:', error);
         res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// Delete exam and all related data (teacher only)
+exports.deleteExam = async (req, res) => {
+    let client;
+    try {
+        client = await pool.connect();
+        const { id } = req.params;
+        const teacherId = req.user.id;
+
+        // Verify ownership
+        const examResult = await client.query('SELECT id FROM exams WHERE id = $1 AND teacher_id = $2', [id, teacherId]);
+        if (examResult.rows.length === 0) {
+            return res.status(404).json({ message: 'Exam not found or unauthorized' });
+        }
+
+        await client.query('BEGIN');
+
+        // Get all submission IDs for this exam
+        const subs = await client.query('SELECT id FROM submissions WHERE exam_id = $1', [id]);
+        const subIds = subs.rows.map(r => r.id);
+
+        if (subIds.length > 0) {
+            // Get all answer IDs for these submissions
+            const ans = await client.query('SELECT id FROM answers WHERE submission_id = ANY($1)', [subIds]);
+            const ansIds = ans.rows.map(r => r.id);
+
+            if (ansIds.length > 0) {
+                await client.query('DELETE FROM nlp_evaluations WHERE answer_id = ANY($1)', [ansIds]);
+                await client.query('DELETE FROM pac_scores WHERE answer_id = ANY($1)', [ansIds]);
+                await client.query('DELETE FROM ati_scores WHERE answer_id = ANY($1)', [ansIds]);
+            }
+
+            await client.query('DELETE FROM answers WHERE submission_id = ANY($1)', [subIds]);
+            await client.query('DELETE FROM final_grades WHERE submission_id = ANY($1)', [subIds]);
+        }
+
+        await client.query('DELETE FROM submissions WHERE exam_id = $1', [id]);
+        await client.query('DELETE FROM monitoring_logs WHERE exam_id = $1', [id]);
+        await client.query('DELETE FROM students_exam WHERE exam_id = $1', [id]);
+        await client.query('DELETE FROM classrooms WHERE exam_id = $1', [id]);
+        await client.query('DELETE FROM chat_messages WHERE exam_id = $1', [id]);
+        await client.query('DELETE FROM exams WHERE id = $1', [id]);
+
+        await client.query('COMMIT');
+        res.json({ message: 'Exam deleted successfully' });
+    } catch (error) {
+        if (client) await client.query('ROLLBACK').catch(() => { });
+        console.error('Delete exam error:', error);
+        res.status(500).json({ message: 'Server error' });
+    } finally {
+        if (client) client.release();
     }
 };
