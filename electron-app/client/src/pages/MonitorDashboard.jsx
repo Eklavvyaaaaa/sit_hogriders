@@ -2,8 +2,9 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import api from '../services/api';
-import { ShieldAlert, RefreshCw, EyeOff, UserSearch, AlertCircle, Download, Flag, BarChart3, ArrowLeft } from 'lucide-react';
+import { ShieldAlert, RefreshCw, EyeOff, UserSearch, AlertCircle, Download, Flag, BarChart3, ArrowLeft, Video } from 'lucide-react';
 import ChatBox from '../components/ChatBox';
+import LiveVideoModal from '../components/LiveVideoModal';
 
 const MonitorDashboard = () => {
   const { examId } = useParams();
@@ -13,6 +14,7 @@ const MonitorDashboard = () => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [examStats, setExamStats] = useState(null);
+  const [selectedStudentForVideo, setSelectedStudentForVideo] = useState(null);
 
   const fetchLogs = useCallback(async () => {
     try {
@@ -186,7 +188,15 @@ const MonitorDashboard = () => {
                       <span className={`text-[10px] font-black uppercase tracking-widest ${status.text}`}>{status.label}</span>
                     </div>
                     <span className={`text-2xl font-black mt-1 ${status.text}`}>{student.violation_count}</span>
-                    <p className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Violations</p>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold mb-3">Violations</p>
+
+                    <button
+                      onClick={() => setSelectedStudentForVideo(student)}
+                      className="mt-auto w-full py-2 bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-600 rounded-lg text-xs font-bold transition-colors flex items-center justify-center space-x-1.5"
+                    >
+                      <Video size={14} />
+                      <span>Live View</span>
+                    </button>
                   </div>
                 );
               })
@@ -252,6 +262,15 @@ const MonitorDashboard = () => {
           </div>
         )}
       </div>
+
+      {selectedStudentForVideo && (
+        <LiveVideoModal
+          student={selectedStudentForVideo}
+          examId={examId}
+          onClose={() => setSelectedStudentForVideo(null)}
+        />
+      )}
+
       <ChatBox examId={examId} />
     </div>
   );

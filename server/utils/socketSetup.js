@@ -65,6 +65,9 @@ function initSocket(httpServer) {
     io.on('connection', (socket) => {
         console.log(`Socket connected: ${socket.id} (user: ${socket.user?.id})`);
 
+        // Join a personal room to allow targeted direct messaging (like WebRTC signaling)
+        socket.join(`user:${socket.user.id}`);
+
         // Teachers join an exam room to receive updates
         socket.on('join:exam', async (examId, callback) => {
             const parsedId = parseInt(examId, 10);
@@ -165,6 +168,52 @@ function initSocket(httpServer) {
                 if (typeof callback === 'function') callback({ error: 'Server error' });
             }
         });
+
+        // ==========================================
+        // WebRTC Signaling Events
+        // ==========================================
+
+        // Teacher requests a live feed from a student
+        socket.on('webrtc:request', ({ studentId, examId }, callback) => {
+            // Relay the request to the specific student's personal socket room
+            io.to(`user:${studentId}`).emit('webrtc:request', {
+                teacherId: socket.user.id,
+                examId
+            });
+            if (typeof callback === 'function') callback({ success: true });
+        });
+
+        // Student sends a WebRTC offer to the teacher
+        socket.on('webrtc:offer', ({ targetTeacherId, offer, examId }, callback) => {
+            io.to(`user:${targetTeacherId}`).emit('webrtc:offer', {
+                studentId: socket.user.id,
+                offer,
+                examId
+            });
+            if (typeof callback === 'function') callback({ success: true });
+        });
+
+        // Teacher sends a WebRTC answer back to the student
+        socket.on('webrtc:answer', ({ targetStudentId, answer, examId }, callback) => {
+            io.to(`user:${targetStudentId}`).emit('webrtc:answer', {
+                teacherId: socket.user.id,
+                answer,
+                examId
+            });
+            if (typeof callback === 'function') callback({ success: true });
+        });
+
+        // Ice candidates for NAT traversal (from either to either)
+        socket.on('webrtc:ice-candidate', ({ targetUserId, candidate, examId }, callback) => {
+            io.to(`user:${targetUserId}`).emit('webrtc:ice-candidate', {
+                senderId: socket.user.id,
+                candidate,
+                examId
+            });
+            if (typeof callback === 'function') callback({ success: true });
+        });
+
+        // ==========================================
 
         socket.on('disconnect', () => {
             console.log(`Socket disconnected: ${socket.id}`);
