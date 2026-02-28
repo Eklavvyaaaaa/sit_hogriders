@@ -60,6 +60,7 @@ const ExamPage = () => {
         };
     }, [examData, navigate, registerLocalStream, unregisterLocalStream]);
 
+
     const handleStartExam = () => {
         ignoreNextBlur.current = true;
         setHasStarted(true);
