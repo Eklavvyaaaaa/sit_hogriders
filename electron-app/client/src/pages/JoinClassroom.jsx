@@ -85,17 +85,17 @@ const JoinClassroom = () => {
     const isComplete = code.join('').length === 6;
 
     return (
-        <div className="min-h-screen flex flex-col font-inter overflow-hidden bg-white">
+        <div style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }} className="min-h-screen flex flex-col font-inter overflow-hidden transition-colors duration-200">
             <Navbar />
 
             <div className="flex-1 flex overflow-hidden">
                 {/* ── LEFT PANEL ── */}
-                <div className="hidden lg:flex w-1/2 bg-white flex-col relative p-16 justify-between border-r border-slate-100">
+                <div style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }} className="hidden lg:flex w-1/2 flex-col relative p-16 justify-between border-r">
                     <div className="space-y-10">
                         <div className="space-y-3">
-                            <p className="text-[11px] font-black text-blue-600 uppercase tracking-widest">Student Portal</p>
-                            <h1 className="text-5xl font-black text-slate-900 tracking-tighter leading-tight">Ready to<br />Begin?</h1>
-                            <p className="text-lg text-slate-500 font-medium leading-relaxed max-w-sm">
+                            <p style={{ color: 'var(--accent-color)' }} className="text-[11px] font-black uppercase tracking-widest">Student Portal</p>
+                            <h1 style={{ color: 'var(--text-primary)' }} className="text-5xl font-black tracking-tighter leading-tight">Ready to<br />Begin?</h1>
+                            <p style={{ color: 'var(--text-secondary)' }} className="text-lg font-medium leading-relaxed max-w-sm">
                                 Enter your exam code and start your secure assessment session.
                             </p>
                         </div>
@@ -105,9 +105,9 @@ const JoinClassroom = () => {
                             <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Past Exam Results</p>
 
                             {historyLoading ? (
-                                <div className="flex flex-col items-center justify-center py-6 bg-slate-50 rounded-xl border border-slate-100">
-                                    <Loader2 size={24} className="text-blue-400 animate-spin mb-2" />
-                                    <p className="text-slate-400 text-sm font-medium">Loading history...</p>
+                                <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="flex flex-col items-center justify-center py-6 rounded-xl border">
+                                    <Loader2 size={24} style={{ color: 'var(--accent-color)' }} className="animate-spin mb-2" />
+                                    <p style={{ color: 'var(--text-muted)' }} className="text-sm font-medium">Loading history...</p>
                                 </div>
                             ) : historyError ? (
                                 <div className="bg-red-50 p-4 rounded-xl border border-red-100 flex items-center space-x-3">
@@ -128,8 +128,8 @@ const JoinClassroom = () => {
                                     </button>
                                 </div>
                             ) : pastExams.length === 0 ? (
-                                <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 text-center">
-                                    <p className="text-slate-500 text-sm font-medium">No past exams found.</p>
+                                <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="p-6 rounded-xl border text-center">
+                                    <p style={{ color: 'var(--text-muted)' }} className="text-sm font-medium">No past exams found.</p>
                                 </div>
                             ) : (
                                 <div className="space-y-3">
@@ -165,9 +165,10 @@ const JoinClassroom = () => {
                                                 type="button"
                                                 onClick={() => { if (canNavigate) navigate(`/history/submission/${exam.submission_id}`); }}
                                                 disabled={!canNavigate}
-                                                className={`group relative flex items-center justify-between bg-white rounded-2xl p-5 border border-slate-200 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] transition-all duration-300 overflow-hidden text-left w-full ${canNavigate
-                                                        ? 'hover:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.1)] hover:border-blue-300 cursor-pointer'
-                                                        : 'opacity-70 cursor-default'
+                                                style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+                                                className={`group relative flex items-center justify-between rounded-2xl p-5 border shadow-sm transition-all duration-300 overflow-hidden text-left w-full ${canNavigate
+                                                    ? 'hover:shadow-md cursor-pointer'
+                                                    : 'opacity-70 cursor-default'
                                                     }`}
                                             >
                                                 {/* Left structural visual */}
@@ -184,13 +185,13 @@ const JoinClassroom = () => {
                                                         </p>
                                                     </div>
 
-                                                    <p className="text-slate-800 font-bold text-base tracking-tight leading-tight mb-2 group-hover:text-blue-700 transition-colors line-clamp-1">
+                                                    <p style={{ color: 'var(--text-primary)' }} className="font-bold text-base tracking-tight leading-tight mb-2 transition-colors line-clamp-1">
                                                         {exam.exam_title || 'Untitled Exam'}
                                                     </p>
 
-                                                    <div className="flex items-center gap-3 text-xs text-slate-500 font-medium">
-                                                        <span className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-2 py-1 rounded-md text-[11px]">
-                                                            <Calendar size={12} className="text-slate-400" />
+                                                    <div className="flex items-center gap-3 text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+                                                        <span style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }} className="flex items-center gap-1.5 border px-2 py-1 rounded-md text-[11px]">
+                                                            <Calendar size={12} style={{ color: 'var(--text-muted)' }} />
                                                             {formatDate(exam.submitted_at)}
                                                         </span>
                                                     </div>
@@ -230,23 +231,23 @@ const JoinClassroom = () => {
                 </div>
 
                 {/* ── RIGHT PANEL ── */}
-                <div className="w-full lg:w-1/2 bg-[#f0f7ff] flex items-center justify-center p-8 relative overflow-y-auto">
+                <div style={{ backgroundColor: 'var(--bg-primary)' }} className="w-full lg:w-1/2 flex items-center justify-center p-8 relative overflow-y-auto">
                     {/* Background blob */}
-                    <div className="absolute top-1/4 right-0 w-96 h-96 bg-blue-600/10 blur-[100px] rounded-full pointer-events-none"></div>
+                    <div className="absolute top-1/4 right-0 w-96 h-96 bg-blue-600/10 blur-[100px] rounded-full pointer-events-none" style={{ opacity: 0.5 }}></div>
 
                     <div className="w-full max-w-md space-y-8">
                         {/* ── Code entry card ── */}
-                        <div className="bg-white rounded-2xl shadow-2xl border border-white/50 relative overflow-hidden">
-                            <div className="absolute top-0 left-0 w-full h-1.5 bg-blue-600"></div>
+                        <div style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} className="rounded-2xl shadow-2xl border relative overflow-hidden">
+                            <div style={{ backgroundColor: 'var(--accent-color)' }} className="absolute top-0 left-0 w-full h-1.5"></div>
                             <div className="p-10">
                                 {/* Header */}
                                 <div className="flex items-center space-x-3 mb-1">
-                                    <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center">
-                                        <BookOpen size={18} className="text-blue-600" />
+                                    <div style={{ backgroundColor: 'var(--accent-light)' }} className="w-9 h-9 rounded-xl flex items-center justify-center">
+                                        <BookOpen size={18} style={{ color: 'var(--accent-color)' }} />
                                     </div>
-                                    <h2 className="text-3xl font-black text-slate-900 tracking-tight">Join Exam</h2>
+                                    <h2 style={{ color: 'var(--text-primary)' }} className="text-3xl font-black tracking-tight">Join Exam</h2>
                                 </div>
-                                <p className="text-slate-500 text-sm mb-8 font-medium">
+                                <p style={{ color: 'var(--text-secondary)' }} className="text-sm mb-8 font-medium">
                                     Enter the 6-character code provided by your instructor.
                                 </p>
 
@@ -266,11 +267,12 @@ const JoinClassroom = () => {
                                                 type="text"
                                                 maxLength={1}
                                                 aria-label={`code digit ${i + 1} of ${code.length}`}
-                                                className={`w-full aspect-square text-center text-2xl font-black rounded-xl border-2 focus:ring-0 outline-none transition-all uppercase
-                                                    ${char
-                                                        ? 'border-blue-600 bg-blue-50 text-blue-700'
-                                                        : 'bg-slate-50 border-slate-100 text-slate-900 focus:border-blue-500 focus:bg-white'
-                                                    }`}
+                                                className="w-full aspect-square text-center text-2xl font-black rounded-xl border-2 focus:ring-0 outline-none transition-all uppercase"
+                                                style={{
+                                                    backgroundColor: char ? 'var(--accent-light)' : 'var(--input-bg)',
+                                                    borderColor: char ? 'var(--accent-color)' : 'var(--input-border)',
+                                                    color: char ? 'var(--accent-color)' : 'var(--text-primary)'
+                                                }}
                                                 value={char}
                                                 onChange={(e) => handleInput(e, i)}
                                                 onKeyDown={(e) => handleKeyDown(e, i)}
@@ -281,7 +283,7 @@ const JoinClassroom = () => {
                                     <button
                                         type="submit"
                                         disabled={!isComplete || loading}
-                                        className="w-full flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black py-5 rounded-full shadow-xl shadow-blue-200 transition-all active:scale-[0.98] text-lg"
+                                        className="btn btn-primary w-full py-4 rounded-xl shadow-lg flex items-center justify-center gap-2 text-lg font-bold"
                                     >
                                         {loading ? (
                                             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -296,7 +298,7 @@ const JoinClassroom = () => {
                             </div>
                         </div>
 
-                        <p className="text-center text-slate-400 text-[11px] font-semibold mt-8">
+                        <p style={{ color: 'var(--text-muted)' }} className="text-center text-[11px] font-semibold mt-8">
                             Protected by ATI Smart Monitoring Technology
                         </p>
                     </div>
