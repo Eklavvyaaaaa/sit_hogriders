@@ -12,18 +12,23 @@ const StudentHistory = () => {
     const [sortField, setSortField] = useState('date');
     const [sortOrder, setSortOrder] = useState('desc');
     const [statusFilter, setStatusFilter] = useState('all');
+    const [page, setPage] = useState(1);
+    const [totalRecords, setTotalRecords] = useState(0);
+    const ITEMS_PER_PAGE = 10;
     const navigate = useNavigate();
 
     useEffect(() => {
         let isMounted = true;
         const fetchData = async () => {
             try {
+                setLoading(true);
                 const [historyRes, upcomingRes] = await Promise.all([
-                    api.get('/history/student'),
+                    api.get(`/history/student?page=${page}&limit=${ITEMS_PER_PAGE}`),
                     api.get('/history/upcoming').catch(() => ({ data: [] }))
                 ]);
                 if (!isMounted) return;
-                setHistory(historyRes.data);
+                setHistory(historyRes.data?.data || []);
+                setTotalRecords(historyRes.data?.total || 0);
                 setUpcoming(upcomingRes.data);
                 setError(null);
             } catch (err) {
@@ -36,7 +41,7 @@ const StudentHistory = () => {
         };
         fetchData();
         return () => { isMounted = false; };
-    }, []);
+    }, [page]);
 
     const getScoreBadge = (score) => {
         if (score === null || score === undefined) return { bg: 'bg-slate-50', text: 'text-slate-500', border: 'border-slate-200' };
@@ -279,6 +284,31 @@ const StudentHistory = () => {
                                 </tbody>
                             </table>
                         </div>
+
+                        {/* Pagination Controls */}
+                        {totalRecords > ITEMS_PER_PAGE && (
+                            <div className="flex items-center justify-between mt-6">
+                                <button
+                                    disabled={page <= 1}
+                                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                                    className="btn btn-ghost btn-sm"
+                                    style={{ opacity: page <= 1 ? 0.4 : 1 }}
+                                >
+                                    ← Previous
+                                </button>
+                                <span style={{ color: 'var(--text-secondary)' }} className="text-xs font-semibold">
+                                    Page {page} of {Math.ceil(totalRecords / ITEMS_PER_PAGE)}
+                                </span>
+                                <button
+                                    disabled={page >= Math.ceil(totalRecords / ITEMS_PER_PAGE)}
+                                    onClick={() => setPage(p => p + 1)}
+                                    className="btn btn-ghost btn-sm"
+                                    style={{ opacity: page >= Math.ceil(totalRecords / ITEMS_PER_PAGE) ? 0.4 : 1 }}
+                                >
+                                    Next →
+                                </button>
+                            </div>
+                        )}
                     </>
                 )}
             </div>

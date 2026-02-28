@@ -4,8 +4,11 @@ const { query } = require('../config/db');
 exports.getStudentHistory = async (req, res) => {
     try {
         const studentId = req.user.id;
+        const limit = parseInt(req.query.limit) || 0;     // 0 = no limit
+        const page = parseInt(req.query.page) || 1;
+        const offset = limit > 0 ? (page - 1) * limit : 0;
 
-        const result = await query(`
+        let sql = `
             SELECT
                 s.id as submission_id,
                 s.exam_id,
@@ -26,7 +29,22 @@ exports.getStudentHistory = async (req, res) => {
             LEFT JOIN students_exam se ON se.student_id = s.student_id AND se.exam_id = s.exam_id
             WHERE s.student_id = $1
             ORDER BY s.submitted_at DESC NULLS LAST
-        `, [studentId]);
+        `;
+        const params = [studentId];
+
+        if (limit > 0) {
+            sql += ` LIMIT $2 OFFSET $3`;
+            params.push(limit, offset);
+        }
+
+        const result = await query(sql, params);
+
+        // Also get total count for pagination info
+        const countResult = await query(
+            'SELECT COUNT(*) as total FROM submissions WHERE student_id = $1',
+            [studentId]
+        );
+        const total = parseInt(countResult.rows[0].total);
 
         const rows = result.rows.map(row => {
             let trust_band = 'Not Evaluated';
@@ -38,7 +56,7 @@ exports.getStudentHistory = async (req, res) => {
             return { ...row, trust_band };
         });
 
-        res.json(rows);
+        res.json({ data: rows, total, page, limit: limit || total });
     } catch (error) {
         console.error('Student history error:', error);
         res.status(500).json({ message: 'Server error' });
