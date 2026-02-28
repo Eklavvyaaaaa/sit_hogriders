@@ -143,6 +143,11 @@ exports.submitExam = async (req, res) => {
             }
         });
 
+        // Extract UI violation score
+        const studentRecord = enrollResult.rows[0];
+        const violationCount = studentRecord.violation_count || 0;
+        const visualScore = Math.max(0, 100 - (violationCount * 10));
+
         // 2. ATI scoring for subjective (outside transaction to avoid hanging)
         let totalATI = 0;
         let totalContent = 0;
@@ -171,7 +176,7 @@ exports.submitExam = async (req, res) => {
                 let atiResult;
                 if (answerText.trim()) {
                     try {
-                        atiResult = await evaluateATI(answerText, modelAnswer, keyPoints);
+                        atiResult = await evaluateATI(answerText, modelAnswer, keyPoints, visualScore);
                     } catch (err) {
                         console.error(`ATI engine call failed:`, err.message);
                         atiResult = {
