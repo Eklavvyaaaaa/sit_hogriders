@@ -16,6 +16,7 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 const historyRoutes = require('./routes/historyRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const questionBankRoutes = require('./routes/questionBankRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -38,6 +39,7 @@ app.use('/history', historyRoutes);
 app.use('/api/review', reviewRoutes);
 app.use('/chat', chatRoutes);
 app.use('/api/questions', questionBankRoutes);
+app.use('/notifications', notificationRoutes);
 
 // Database initialization & Server start
 const startServer = async () => {

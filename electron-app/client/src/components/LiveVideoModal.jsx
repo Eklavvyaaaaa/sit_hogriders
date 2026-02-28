@@ -11,23 +11,33 @@ const LiveVideoModal = ({ student, examId, onClose }) => {
     const studentId = student.sender_id || student.id || student.student_id;
 
     useEffect(() => {
-        // Fire request so WebRTCContext negotiates with Student globally
+        // Stop retrying if already connected, failed, or if stream arrived
+        if (status !== 'connecting' || remoteStreams[studentId]) return;
+
+        console.log(`[LiveVideoModal] Requesting feed for ${studentId}...`);
         requestVideoFeed(studentId, examId);
 
         const retryInterval = setInterval(() => {
-            if (!remoteStreams[studentId]) {
-                console.log("[LiveVideoModal] Checking stream availability...");
-                requestVideoFeed(studentId, examId);
+            // Re-check status inside interval to stop correctly
+            if (status !== 'connecting' || remoteStreams[studentId]) {
+                clearInterval(retryInterval);
+                return;
             }
-        }, 5000); // Retry every 5 seconds if connection fails
+            console.log(`[LiveVideoModal] Retrying feed for ${studentId}...`);
+            requestVideoFeed(studentId, examId);
+        }, 5000);
+
+        const failTimeout = setTimeout(() => {
+            if (status === 'connecting' && !remoteStreams[studentId]) {
+                setStatus('failed');
+            }
+        }, 30000);
 
         return () => {
             clearInterval(retryInterval);
-            // We do NOT call closeVideoFeed() here! We just unmount the modal.
-            // This is the core architectural fix: the stream stays alive in the background
-            // even if the teacher closes the modal and reopens it.
+            clearTimeout(failTimeout);
         };
-    }, [studentId, examId, requestVideoFeed, remoteStreams]);
+    }, [studentId, examId, requestVideoFeed, status, remoteStreams]);
 
     // Attach stream to video element when it arrives
     useEffect(() => {

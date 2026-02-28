@@ -279,6 +279,7 @@ exports.submitExam = async (req, res) => {
             res.status(201).json({
                 message: 'Exam submitted successfully',
                 submissionId,
+                examId,
                 mcqScore: mcqCount > 0 ? `${mcqScore}/${mcqCount}` : 'N/A',
                 subjectiveEvaluated: subjectiveCount,
                 finalScore: Math.round(finalScore * 10) / 10

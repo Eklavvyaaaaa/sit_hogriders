@@ -55,7 +55,7 @@ const TeacherDashboard = () => {
             setLoading(true);
             setError(null);
             const [examsResult, overviewResult] = await Promise.allSettled([
-                api.get('/exam/my-exams'),
+                api.get('/exam'),
                 api.get('/dashboard/overview')
             ]);
             if (examsResult.status === 'fulfilled') setExams(examsResult.value.data);
