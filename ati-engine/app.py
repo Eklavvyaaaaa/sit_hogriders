@@ -87,7 +87,11 @@ def evaluate_ati():
         if err:
             return err
 
-        visual_score = data.get("visual_score", 100)
+        raw_visual_score = data.get("visual_score", 100)
+        try:
+            visual_score = float(raw_visual_score)
+        except (ValueError, TypeError):
+            return jsonify({"error": "visual_score must be a number"}), 400
 
         # ── Component Scores (unchanged internals) ──
         cis_result = calculate_cis(inputs["student_answer"], inputs["model_answer"], inputs["key_points"])  # type: ignore
@@ -103,10 +107,10 @@ def evaluate_ati():
         # 1. Base = Content Score (academic quality is the anchor)
         base = content_score
 
-        # 2. Integrity Multiplier (visual / 100, clamped 0.0–1.0)
+        # 2. Integrity Multiplier (visual / 100, clamped 0.0-1.0)
         #    Perfect behavior (100) → multiplier 1.0 (no effect)
         #    Poor behavior (40)    → multiplier 0.4 (heavy reduction)
-        integrity_multiplier = max(0.0, min(float(visual_score) / 100.0, 1.0))
+        integrity_multiplier = max(0.0, min(visual_score / 100.0, 1.0))
         ati_score = base * integrity_multiplier
 
         # 3. Pattern Gate — caps score for anomalous writing patterns

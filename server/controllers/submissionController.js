@@ -300,76 +300,103 @@ async function calculateScores(client, submission_id, exam_id) {
     [submission_id]
   );
 
+  // Update the submissions score field natively if we can compute the mcqScore
+  let mcqScore = 0;
+  let mcqCount = 0;
   let totalATI = 0;
   let totalContent = 0;
-  let answerCount = 0;
+  let subjectiveCount = 0;
 
-  for (const ans of answersResult.rows) {
-    const question = questions.find(q => q.id === ans.question_id || q.question_id === ans.question_id);
+  for (const q of questions) {
+    const ans = answersResult.rows.find(a => a.question_id === q.id || a.question_id === q.question_id);
+    const answerText = ans?.answer_text || '';
 
-    const modelAnswer = question?.model_answer || question?.answer || '';
-    const keyPoints = question?.key_points || [];
-
-    let atiResult;
-
-    if (modelAnswer && ans.answer_text) {
-      try {
-        atiResult = await evaluateATI(ans.answer_text, modelAnswer, keyPoints);
-      } catch (err) {
-        console.error(`ATI engine call failed for answer ${ans.id}:`, err.message);
-        atiResult = {
-          content_score: 0,
-          pattern_score: 0,
-          ati_score: 0,
-          trust_level: 'Low Trust'
-        };
+    if (q.type !== 'subjective') {
+      mcqCount++;
+      if (answerText) {
+        const selectedInt = parseInt(answerText, 10);
+        if (!isNaN(selectedInt) && selectedInt === q.correctOption) {
+          mcqScore++;
+        } else if (answerText === String(q.correctOption)) {
+          mcqScore++;
+        }
       }
     } else {
-      atiResult = {
-        content_score: 0,
-        pattern_score: 0,
-        ati_score: 0,
-        trust_level: 'Low Trust'
-      };
+      subjectiveCount++;
+      const modelAnswer = q.model_answer || q.answer || '';
+      const keyPoints = q.key_points || [];
+
+      let atiResult;
+
+      if (modelAnswer && answerText.trim()) {
+        try {
+          atiResult = await evaluateATI(answerText, modelAnswer, keyPoints);
+        } catch (err) {
+          console.error(`ATI engine call failed for answer ${ans?.id}:`, err.message);
+          atiResult = { content_score: 0, pattern_score: 0, ati_score: 0, trust_level: 'Low Trust' };
+        }
+      } else {
+        atiResult = { content_score: 0, pattern_score: 0, ati_score: 0, trust_level: 'Low Trust' };
+      }
+
+      if (ans) {
+        await client.query(
+          `INSERT INTO nlp_evaluations (answer_id, semantic_score, reasoning_score)
+           VALUES ($1, $2, $3) ON CONFLICT (answer_id) DO UPDATE SET semantic_score = $2, reasoning_score = $3`,
+          [ans.id, atiResult.content_score / 100, atiResult.pattern_score / 100]
+        );
+
+        await client.query(
+          `INSERT INTO pac_scores (answer_id, similarity_score)
+           VALUES ($1, $2) ON CONFLICT (answer_id) DO UPDATE SET similarity_score = $2`,
+          [ans.id, atiResult.pattern_score / 100]
+        );
+
+        await client.query(
+          `INSERT INTO ati_scores (answer_id, ati_value)
+           VALUES ($1, $2) ON CONFLICT (answer_id) DO UPDATE SET ati_value = $2`,
+          [ans.id, atiResult.ati_score]
+        );
+      }
+
+      totalATI += atiResult.ati_score;
+      totalContent += atiResult.content_score;
     }
-
-    await client.query(
-      `INSERT INTO nlp_evaluations (answer_id, semantic_score, reasoning_score)
-       VALUES ($1, $2, $3) ON CONFLICT (answer_id) DO UPDATE SET semantic_score = $2, reasoning_score = $3`,
-      [ans.id, atiResult.content_score / 100, atiResult.pattern_score / 100]
-    );
-
-    await client.query(
-      `INSERT INTO pac_scores (answer_id, similarity_score)
-       VALUES ($1, $2) ON CONFLICT (answer_id) DO UPDATE SET similarity_score = $2`,
-      [ans.id, atiResult.pattern_score / 100]
-    );
-
-    await client.query(
-      `INSERT INTO ati_scores (answer_id, ati_value)
-       VALUES ($1, $2) ON CONFLICT (answer_id) DO UPDATE SET ati_value = $2`,
-      [ans.id, atiResult.ati_score]
-    );
-
-    totalATI += atiResult.ati_score;
-    totalContent += atiResult.content_score;
-    answerCount++;
   }
 
-  // ── Final Score = Pure Academic Content Score ──
-  // ATI is stored for proctoring review but does NOT reduce the academic grade.
-  const avgContent = answerCount > 0 ? Math.round((totalContent / answerCount) * 100) / 100 : 0;
-  const avgATI = answerCount > 0 ? Math.round((totalATI / answerCount) * 100) / 100 : 0;
+  // Update mcqScore in the submission row
+  await client.query('UPDATE submissions SET score = $1 WHERE id = $2', [mcqScore, submission_id]);
 
-  // Trust factor is informational only (based on ATI), never applied to grade
-  const trustFactor = avgATI >= 80 ? 1.0 : avgATI >= 55 ? 0.85 : 0.6;
+  // ── Final Score Blending ──
+  let baseScore = 0;
+  let finalScore = 0;
+  let trustFactor = 1.0;
 
-  // Final score = content score (academic merit only)
-  const finalScore = avgContent;
+  if (subjectiveCount > 0) {
+    const avgATI = totalATI / subjectiveCount;
+    const avgContent = totalContent / subjectiveCount;
+
+    // Trust factor is informational only (based on ATI), never applied to grade
+    trustFactor = avgATI >= 80 ? 1.0 : avgATI >= 55 ? 0.85 : 0.6;
+
+    // Blend MCQ + Content scores
+    const mcqPercent = mcqCount > 0 ? (mcqScore / mcqCount) * 100 : 0;
+    const totalQuestions = mcqCount + subjectiveCount;
+    const mcqWeight = mcqCount / totalQuestions;
+    const subjectiveWeight = subjectiveCount / totalQuestions;
+
+    baseScore = (mcqPercent * mcqWeight + avgContent * subjectiveWeight);
+    finalScore = baseScore;  // ATI does not reduce academic grade
+  } else {
+    // Pure MCQ exam
+    baseScore = mcqCount > 0 ? (mcqScore / mcqCount) * 100 : 0;
+    finalScore = baseScore;
+    trustFactor = 1.0;
+  }
 
   await client.query(
     `INSERT INTO final_grades (submission_id, base_score, trust_factor, final_score)
      VALUES ($1, $2, $3, $4) ON CONFLICT (submission_id) DO UPDATE SET base_score = $2, trust_factor = $3, final_score = $4`,
-    [submission_id, avgContent, trustFactor, finalScore]
+    [submission_id, baseScore, trustFactor, finalScore]
   );
 }

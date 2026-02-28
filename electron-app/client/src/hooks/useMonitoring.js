@@ -98,7 +98,7 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
     const [alerts, setAlerts] = useState([]);
     const [riskScore, setRiskScore] = useState(0);
     const [integrityScore, setIntegrityScore] = useState(100);
-    const [riskLevel, setRiskLevel] = useState(RISK_LEVELS.LOW);
+    const [riskLevel, setRiskLevel] = useState(getRiskLevel(0));
     const [monitoringError, setMonitoringError] = useState(null);
     const [isReady, setIsReady] = useState(false);
 
@@ -252,20 +252,82 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
             api.post('/monitor/log', {
                 examId, eventType: `CRITICAL_RISK: ${eventType}`,
                 confidence, severity: 'critical'
-            }).catch(e => err('Risk', 'Failed to send critical risk:', e.message));
+            }).catch(e => {
+                err('Risk', 'Failed to send critical risk:', e.message);
+                enqueueFailedLog({ examId, eventType: `CRITICAL_RISK: ${eventType}`, confidence, severity: 'critical', weight, riskAfter: newRisk });
+            });
         } else if (level === RISK_LEVELS.HIGH) {
             log('Risk', '🟠 HIGH RISK — notifying server');
             api.post('/monitor/log', {
                 examId, eventType: `HIGH_RISK: ${eventType}`,
                 confidence, severity: 'high'
-            }).catch(e => err('Risk', 'Failed to send high risk:', e.message));
+            }).catch(e => {
+                err('Risk', 'Failed to send high risk:', e.message);
+                enqueueFailedLog({ examId, eventType: `HIGH_RISK: ${eventType}`, confidence, severity: 'high', weight, riskAfter: newRisk });
+            });
         } else {
             // Standard log for medium/low events
             api.post('/monitor/log', {
                 examId, eventType, confidence, severity: level
-            }).catch(e => err('Log', 'Failed to send log:', e.message));
+            }).catch(e => {
+                err('Log', 'Failed to send log:', e.message);
+                enqueueFailedLog({ examId, eventType, confidence, severity: level, weight, riskAfter: newRisk });
+            });
         }
     }, [examId]);
+
+    // ══════════════════════════════════════════════════════
+    // 3. RETRY QUEUE HELPERS
+    // ══════════════════════════════════════════════════════
+    const enqueueFailedLog = (payload) => {
+        try {
+            const queue = JSON.parse(localStorage.getItem('monitoring_retry_queue') || '[]');
+            queue.push({ ...payload, failedAt: Date.now(), attempts: 0 });
+            localStorage.setItem('monitoring_retry_queue', JSON.stringify(queue));
+        } catch (e) {
+            console.error('Failed to enqueue log:', e);
+        }
+    };
+
+    const processRetryQueue = useCallback(async () => {
+        try {
+            const queue = JSON.parse(localStorage.getItem('monitoring_retry_queue') || '[]');
+            if (queue.length === 0) return;
+
+            const newQueue = [];
+            for (const item of queue) {
+                // Exponential backoff: Base 2s * 2^attempts
+                const backoffMs = 2000 * Math.pow(2, item.attempts);
+                if (Date.now() - item.failedAt < backoffMs) {
+                    newQueue.push(item);
+                    continue; // Skip: waiting for backoff
+                }
+
+                item.attempts++;
+                try {
+                    const { failedAt, attempts, weight, riskAfter, ...payload } = item;
+                    await api.post('/monitor/log', payload);
+                    log('Risk', `Successfully retried failed log: ${payload.eventType}`);
+                } catch (e) {
+                    if (item.attempts < 5) { // Max 5 attempts
+                        item.failedAt = Date.now(); // Reset timer for next backoff
+                        newQueue.push(item);
+                    } else {
+                        err('Risk', 'Dropped failed log after 5 attempts', item);
+                    }
+                }
+            }
+            localStorage.setItem('monitoring_retry_queue', JSON.stringify(newQueue));
+        } catch (e) {
+            console.error('Failed to process retry queue:', e);
+        }
+    }, []);
+
+    useEffect(() => {
+        // Periodically process retry queue
+        const retryTimer = setInterval(processRetryQueue, 5000);
+        return () => clearInterval(retryTimer);
+    }, [processRetryQueue]);
 
     // ══════════════════════════════════════════════════════
     // 3. RISK DECAY TIMER
@@ -492,8 +554,8 @@ export const useMonitoring = (examId, onFrameUpdate, options = {}) => {
             const blurDuration = (Date.now() - blurStartRef.current) / 1000;
             blurStartRef.current = null;
 
-            if (blurDuration > 3) {
-                addRisk(12, `Window blur >3s (${blurDuration.toFixed(1)}s)`);
+            if (blurDuration >= 3) {
+                addRisk(12, `Window blur >=3s (${blurDuration.toFixed(1)}s)`);
             } else if (blurDuration >= 0.5) {
                 // Only log blurs longer than 0.5s to avoid accidental clicks
                 addRisk(5, `Window blur <3s (${blurDuration.toFixed(1)}s)`);

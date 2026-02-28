@@ -101,7 +101,7 @@ const MonitoringCamera = ({ examId, stream }) => {
                 </div>
                 <div className="flex items-center space-x-2">
                     {(!isReady) && <span className="text-xs text-yellow-500 animate-pulse">Initializing AI...</span>}
-                    {isReady && <span className="w-2.5 h-2.5 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" style={{ backgroundColor: riskColor }}></span>}
+                    {isReady && <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: riskColor, boxShadow: `0 0 8px ${riskColor}` }}></span>}
                     {isReady && (
                         <span className="text-xs font-semibold" style={{ color: riskColor }}>
                             {RISK_LABELS[riskLevel] || 'Low Risk'}
@@ -136,13 +136,13 @@ const MonitoringCamera = ({ examId, stream }) => {
 
                 {/* Risk Warning Banners */}
                 {riskLevel === 'high' && (
-                    <div className="absolute top-0 left-0 right-0 z-40 flex items-center justify-center bg-orange-900/80 py-2 px-4 animate-pulse">
+                    <div role="alert" aria-live="assertive" className="absolute top-0 left-0 right-0 z-40 flex items-center justify-center bg-orange-900/80 py-2 px-4 animate-pulse">
                         <ShieldAlert size={16} className="text-orange-400 mr-2" />
                         <span className="text-orange-200 text-xs font-semibold">High Risk — Suspicious activity is being recorded</span>
                     </div>
                 )}
                 {riskLevel === 'critical' && (
-                    <div className="absolute top-0 left-0 right-0 z-40 flex items-center justify-center bg-red-900/90 py-2 px-4 animate-pulse">
+                    <div role="alert" aria-live="assertive" className="absolute top-0 left-0 right-0 z-40 flex items-center justify-center bg-red-900/90 py-2 px-4 animate-pulse">
                         <AlertTriangle size={16} className="text-red-400 mr-2" />
                         <span className="text-red-200 text-xs font-bold">Critical Risk — Your session has been flagged for review</span>
                     </div>

@@ -163,15 +163,25 @@ exports.submitExam = async (req, res) => {
 
             atiEvaluations.push({ questionIndex: i, answerText, q });
 
-            if (q.type === 'subjective' && answerText.trim()) {
+            if (q.type === 'subjective') {
+                subjectiveCount++;
                 const modelAnswer = q.model_answer || '';
                 const keyPoints = q.key_points || [];
 
                 let atiResult;
-                try {
-                    atiResult = await evaluateATI(answerText, modelAnswer, keyPoints);
-                } catch (err) {
-                    console.error(`ATI engine call failed:`, err.message);
+                if (answerText.trim()) {
+                    try {
+                        atiResult = await evaluateATI(answerText, modelAnswer, keyPoints);
+                    } catch (err) {
+                        console.error(`ATI engine call failed:`, err.message);
+                        atiResult = {
+                            content_score: 0,
+                            pattern_score: 0,
+                            ati_score: 0,
+                            trust_level: 'Low Trust'
+                        };
+                    }
+                } else {
                     atiResult = {
                         content_score: 0,
                         pattern_score: 0,
@@ -183,7 +193,6 @@ exports.submitExam = async (req, res) => {
                 atiEvaluations[i].atiResult = atiResult;
                 totalATI += atiResult.ati_score;
                 totalContent += atiResult.content_score;
-                subjectiveCount++;
             }
         }
 

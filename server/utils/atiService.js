@@ -147,7 +147,7 @@ function calculatePCS(studentAnswer, modelAnswer) {
  *   1. Base = Content Score (academic quality is the anchor)
  *   2. Integrity Multiplier = visual_score / 100 (can only REDUCE, never inflate)
  *   3. Pattern Gate = caps score for anomalous writing patterns
- *   4. Weak Answer Protection = hard cap if content < 35
+ *   4. Weak Answer Protection = hard cap if content < 50
  */
 async function evaluateATI(studentAnswer, modelAnswer, keyPoints = [], visualScore = 100) {
     // Try external engine only if URL is configured
