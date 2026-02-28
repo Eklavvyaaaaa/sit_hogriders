@@ -15,23 +15,27 @@ const StudentHistory = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
+        let isMounted = true;
         const fetchData = async () => {
             try {
                 const [historyRes, upcomingRes] = await Promise.all([
                     api.get('/history/student'),
                     api.get('/history/upcoming').catch(() => ({ data: [] }))
                 ]);
+                if (!isMounted) return;
                 setHistory(historyRes.data);
                 setUpcoming(upcomingRes.data);
                 setError(null);
             } catch (err) {
+                if (!isMounted) return;
                 console.error('Failed to fetch history', err);
                 setError(err);
             } finally {
-                setLoading(false);
+                if (isMounted) setLoading(false);
             }
         };
         fetchData();
+        return () => { isMounted = false; };
     }, []);
 
     const getScoreBadge = (score) => {
@@ -42,9 +46,10 @@ const StudentHistory = () => {
     };
 
     const getTrustBandBadge = (band) => {
-        if (band === 'High') return 'bg-emerald-50 text-emerald-600 border-emerald-200';
-        if (band === 'Medium') return 'bg-amber-50 text-amber-600 border-amber-200';
-        if (band === 'Low') return 'bg-red-50 text-red-600 border-red-200';
+        const normalized = (band || '').toLowerCase();
+        if (normalized === 'high') return 'bg-emerald-50 text-emerald-600 border-emerald-200';
+        if (normalized === 'medium') return 'bg-amber-50 text-amber-600 border-amber-200';
+        if (normalized === 'low') return 'bg-red-50 text-red-600 border-red-200';
         return 'bg-slate-50 text-slate-500 border-slate-200';
     };
 
@@ -105,7 +110,7 @@ const StudentHistory = () => {
                                     </div>
                                     <div className="flex items-center space-x-1 text-slate-500 text-xs mb-3">
                                         <Timer size={12} className="text-slate-400" />
-                                        <span>{exam.duration} mins</span>
+                                        <span>{exam.duration != null ? `${exam.duration} mins` : '—'}</span>
                                     </div>
                                     <div className="mt-auto">
                                         <span className={`text-[10px] px-2 py-1 rounded-md border font-black uppercase tracking-widest capitalize ${exam.status === 'active'
@@ -116,7 +121,7 @@ const StudentHistory = () => {
                                         </span>
                                     </div>
                                     <button
-                                        onClick={() => navigate('/join')}
+                                        onClick={() => navigate(`/join?examId=${exam.id}`)}
                                         className="mt-3 flex items-center justify-center space-x-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-4 rounded-lg transition-colors"
                                     >
                                         <Play size={12} />
@@ -261,11 +266,9 @@ const StudentHistory = () => {
                                                     )}
                                                 </td>
                                                 <td className="p-4">
-                                                    {item.trust_band && (
-                                                        <span className={`text-[10px] px-2 py-1 rounded-md border font-black uppercase tracking-widest ${getTrustBandBadge(item.trust_band)}`}>
-                                                            {item.trust_band}
-                                                        </span>
-                                                    )}
+                                                    <span className={`text-[10px] px-2 py-1 rounded-md border font-black uppercase tracking-widest ${getTrustBandBadge(item.trust_band)}`}>
+                                                        {item.trust_band || '—'}
+                                                    </span>
                                                 </td>
                                                 <td className="p-4">
                                                     <ChevronRight size={16} className="text-slate-300" />
